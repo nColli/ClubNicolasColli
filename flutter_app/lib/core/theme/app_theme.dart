@@ -8,9 +8,9 @@ class AppColors {
   static const Color card = Color(0xFF1E1E1E);
 
   // Translucent layers
-  static final Color fieldBackground = Colors.white.withOpacity(0.08);
-  static final Color fieldBorder = Colors.white.withOpacity(0.14);
-  static final Color overlay = Colors.black.withOpacity(0.78);
+  static final Color fieldBackground = Colors.white.withValues(alpha: 0.08);
+  static final Color fieldBorder = Colors.white.withValues(alpha: 0.14);
+  static final Color overlay = Colors.black.withValues(alpha: 0.78);
 
   // Text Colors
   static const Color textPrimary = Colors.white;
@@ -38,8 +38,6 @@ class AppTheme {
         onPrimary: Colors.black,
         surface: AppColors.surface,
         onSurface: AppColors.textPrimary,
-        background: AppColors.background,
-        onBackground: AppColors.textPrimary,
       ),
 
       // Global Typography defaults

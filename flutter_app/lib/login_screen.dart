@@ -3,6 +3,7 @@ import 'core/theme/app_theme.dart';
 import 'home_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'services/auth_service.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -246,7 +247,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         GestureDetector(
                           onTap: () {
-                            // TODO: Navigate to Registration
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                            );
                           },
                           child: const Text(
                             'COMENZAR →',
