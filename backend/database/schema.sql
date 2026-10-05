@@ -1,0 +1,49 @@
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+DROP TABLE IF EXISTS USUARIO;
+DROP TABLE IF EXISTS SEDE;
+DROP TABLE IF EXISTS HORARIO_SEDE;
+DROP TABLE IF EXISTS ESPACIO_DEPORTIVO;
+DROP TABLE IF EXISTS RESERVA;
+
+CREATE TABLE IF NOT EXISTS USUARIO (
+    uid VARCHAR(255) PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    apellido VARCHAR(255) NOT NULL,
+    fecha_nacimiento DATE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS SEDE (
+    id SERIAL PRIMARY KEY,
+    nombre varchar(100) NOT NULL,
+    direccion varchar(200) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS HORARIO_SEDE (
+    id SERIAL PRIMARY KEY,
+    sede_id INT NOT NULL REFERENCES sede(id) ON DELETE CASCADE,
+    dia_semana SMALLINT NOT NULL, -- 1 = LUNES, 7 = DOMINGO
+    hora_apertura SMALLINT NOT NULL, -- 0 a 23
+    hora_cierre SMALLINT NOT NULL -- 1 a 24
+);
+
+CREATE TABLE IF NOT EXISTS ESPACIO_DEPORTIVO (
+    id SERIAL PRIMARY KEY,
+    sede_id INT NOT NULL REFERENCES sede(id),
+    numero SMALLINT NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    UNIQUE (sede_id, numero)
+);
+
+CREATE TABLE IF NOT EXISTS RESERVA (
+  id           SERIAL PRIMARY KEY,
+  espacio_id   INT NOT NULL REFERENCES espacio_deportivo(id),
+  usuario_id   VARCHAR(255) NOT NULL REFERENCES USUARIO(uid),
+  fecha        DATE NOT NULL,
+  hora_inicio  SMALLINT NOT NULL,
+  hora_fin     SMALLINT NOT NULL,
+  CONSTRAINT reserva_sin_superposicion EXCLUDE USING gist (
+    espacio_id WITH =,
+    fecha WITH =,
+    int4range(hora_inicio, hora_fin) WITH &&
+  )
+);
