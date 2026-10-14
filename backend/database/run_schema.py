@@ -60,5 +60,6 @@ def execute_sql_file(file_path: str | Path):
 
 
 if __name__ == "__main__":
-    target_sql_file = "schema.sql"
+    # Por defecto ejecuta schema.sql; se puede pasar otro archivo, ej: python run_schema.py seed.sql
+    target_sql_file = sys.argv[1] if len(sys.argv) > 1 else "schema.sql"
     execute_sql_file(target_sql_file)

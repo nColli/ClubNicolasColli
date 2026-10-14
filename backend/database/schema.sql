@@ -1,21 +1,27 @@
 CREATE EXTENSION IF NOT EXISTS btree_gist;
-DROP TABLE IF EXISTS USUARIO;
-DROP TABLE IF EXISTS SEDE;
-DROP TABLE IF EXISTS HORARIO_SEDE;
-DROP TABLE IF EXISTS ESPACIO_DEPORTIVO;
+DROP TABLE IF EXISTS NOTIFICACION;
+DROP TABLE IF EXISTS DISPOSITIVO;
 DROP TABLE IF EXISTS RESERVA;
+DROP TABLE IF EXISTS ESPACIO_DEPORTIVO;
+DROP TABLE IF EXISTS HORARIO_SEDE;
+DROP TABLE IF EXISTS SEDE;
+DROP TABLE IF EXISTS USUARIO;
 
 CREATE TABLE IF NOT EXISTS USUARIO (
     uid VARCHAR(255) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
     nombre VARCHAR(255) NOT NULL,
     apellido VARCHAR(255) NOT NULL,
-    fecha_nacimiento DATE NOT NULL
+    dni VARCHAR(8) NOT NULL, -- 7 u 8 dígitos
+    fecha_nacimiento DATE NOT NULL,
+    CONSTRAINT usuario_dni_unico UNIQUE (dni)
 );
 
 CREATE TABLE IF NOT EXISTS SEDE (
     id SERIAL PRIMARY KEY,
     nombre varchar(100) NOT NULL,
-    direccion varchar(200) NOT NULL
+    direccion varchar(200) NOT NULL,
+    imagen_url VARCHAR(500)
 );
 
 CREATE TABLE IF NOT EXISTS HORARIO_SEDE (
@@ -29,8 +35,10 @@ CREATE TABLE IF NOT EXISTS HORARIO_SEDE (
 CREATE TABLE IF NOT EXISTS ESPACIO_DEPORTIVO (
     id SERIAL PRIMARY KEY,
     sede_id INT NOT NULL REFERENCES sede(id),
+    tipo VARCHAR(50) NOT NULL, -- Fútbol, Tenis, Paddle, etc.
     numero SMALLINT NOT NULL,
     nombre VARCHAR(100) NOT NULL,
+    precio_hora NUMERIC(10, 2) NOT NULL,
     UNIQUE (sede_id, numero)
 );
 
@@ -41,9 +49,37 @@ CREATE TABLE IF NOT EXISTS RESERVA (
   fecha        DATE NOT NULL,
   hora_inicio  SMALLINT NOT NULL,
   hora_fin     SMALLINT NOT NULL,
+  -- Marcan si ya se envió el aviso push de 24 h y de 1 h antes del inicio
+  aviso_24h_enviado BOOLEAN NOT NULL DEFAULT FALSE,
+  aviso_1h_enviado  BOOLEAN NOT NULL DEFAULT FALSE,
   CONSTRAINT reserva_sin_superposicion EXCLUDE USING gist (
     espacio_id WITH =,
     fecha WITH =,
     int4range(hora_inicio, hora_fin) WITH &&
   )
 );
+
+-- Dispositivos donde el usuario recibe notificaciones push (token de FCM).
+-- Un token identifica una instalación de la app; si otro usuario inicia sesión
+-- en el mismo dispositivo, el token pasa a ser suyo.
+CREATE TABLE IF NOT EXISTS DISPOSITIVO (
+  token        VARCHAR(512) PRIMARY KEY,
+  usuario_id   VARCHAR(255) NOT NULL REFERENCES USUARIO(uid) ON DELETE CASCADE,
+  actualizado  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Notificaciones que el usuario ve en la app (la campana del inicio): las de
+-- reservas confirmadas y canceladas, y los recordatorios que también se envían
+-- por push. Si la reserva se cancela, reserva_id queda en NULL.
+CREATE TABLE IF NOT EXISTS NOTIFICACION (
+  id           SERIAL PRIMARY KEY,
+  usuario_id   VARCHAR(255) NOT NULL REFERENCES USUARIO(uid) ON DELETE CASCADE,
+  reserva_id   INT REFERENCES RESERVA(id) ON DELETE SET NULL,
+  titulo       VARCHAR(200) NOT NULL,
+  cuerpo       VARCHAR(500) NOT NULL,
+  creada       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  leida        BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS notificacion_usuario_creada
+  ON NOTIFICACION (usuario_id, creada DESC);

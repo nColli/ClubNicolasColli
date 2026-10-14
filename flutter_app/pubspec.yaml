@@ -1,5 +1,5 @@
 name: flutter_app
-description: "A new Flutter project."
+description: "App del Club Nicolas Colli para reservar espacios deportivos."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   firebase_auth: ^6.7.0
   firebase_core: ^4.15.0
+  http: ^1.6.0
+  firebase_messaging: ^16.7.0
 
 dev_dependencies:
   flutter_test:
