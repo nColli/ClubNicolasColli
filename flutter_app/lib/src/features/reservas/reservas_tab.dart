@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_app/src/constants/constants.dart';
 import 'package:flutter_app/src/enums/enums.dart';
-import 'package:flutter_app/src/features/reservas/widgets/cancelar_reserva_view.dart';
+import 'package:flutter_app/src/features/reservas/widgets/cancelar_reserva_dialog.dart';
 import 'package:flutter_app/src/features/reservas/widgets/reserva_card.dart';
 import 'package:flutter_app/src/models/models.dart';
 import 'package:flutter_app/src/services/services.dart';
@@ -12,27 +12,22 @@ import 'package:flutter_app/src/widgets/widgets.dart';
 
 enum _Pestana { proximas, historial }
 
-/// Pestaña "Mis reservas": próximas e historial. Si hay una reserva elegida
-/// para cancelar muestra la confirmación; esa reserva la controla el home,
-/// igual que la sede abierta en la pestaña de sedes.
+/// Pestaña "Mis reservas": próximas e historial. Al tocar una reserva se
+/// abre su detalle.
 class ReservasTab extends StatefulWidget {
   /// Cuando cambia, se vuelven a cargar las reservas
   final int versionReservas;
-  final Reserva? reservaACancelar;
-  final ValueChanged<Reserva> onCancelar;
   final ValueChanged<Reserva> onAbrirReserva;
 
-  /// `true` si se canceló la reserva (o cambió) y hay que recargar
-  final ValueChanged<bool> onCerrarCancelacion;
+  /// Se canceló una reserva desde la lista: el home recarga las reservas
+  final VoidCallback onReservaCancelada;
   final VoidCallback onReservar;
 
   const ReservasTab({
     super.key,
     required this.versionReservas,
-    required this.reservaACancelar,
-    required this.onCancelar,
     required this.onAbrirReserva,
-    required this.onCerrarCancelacion,
+    required this.onReservaCancelada,
     required this.onReservar,
   });
 
@@ -77,22 +72,13 @@ class _ReservasTabState extends State<ReservasTab> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final reserva = widget.reservaACancelar;
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
-      child: reserva == null
-          ? _lista()
-          : CancelarReservaView(
-              key: ValueKey(reserva.id),
-              reserva: reserva,
-              onCerrar: widget.onCerrarCancelacion,
-            ),
-    );
+  Future<void> _cancelar(Reserva reserva) async {
+    final cambio = await cancelarReservaConConfirmacion(context, reserva);
+    if (cambio && mounted) widget.onReservaCancelada();
   }
 
-  Widget _lista() {
+  @override
+  Widget build(BuildContext context) {
     final ahora = Reloj.ahora();
     // La API las devuelve de la más reciente a la más antigua; las próximas
     // se muestran de la más cercana a la más lejana
@@ -102,7 +88,6 @@ class _ReservasTabState extends State<ReservasTab> {
     final visibles = _pestana == _Pestana.proximas ? proximas : historial;
 
     return RefreshIndicator(
-      key: const ValueKey('lista'),
       color: AppColors.olive,
       onRefresh: _cargar,
       child: ListView(
@@ -170,7 +155,7 @@ class _ReservasTabState extends State<ReservasTab> {
                   reserva: reserva,
                   estado: EstadoReserva.de(reserva, ahora),
                   onCancelar: reserva.cancelable(ahora)
-                      ? () => widget.onCancelar(reserva)
+                      ? () => _cancelar(reserva)
                       : null,
                   onTap: () => widget.onAbrirReserva(reserva),
                 ),

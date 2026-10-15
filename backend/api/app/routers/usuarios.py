@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from firebase_admin import auth, exceptions
 from psycopg2.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -128,6 +129,45 @@ def actualizar_perfil(
         raise
 
     return Usuario.model_validate(usuario)
+
+
+@router.delete(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Dar de baja la cuenta del usuario autenticado",
+    description=(
+        "Elimina al usuario de la base (junto con sus reservas, dispositivos y "
+        "notificaciones) y su cuenta de Firebase. No se puede deshacer."
+    ),
+    responses={
+        401: {"model": ErrorResponse, "description": "Token ausente, inválido o expirado"},
+        404: {"model": ErrorResponse, "description": "El usuario no está registrado en la base"},
+        502: {"model": ErrorResponse, "description": "No se pudo eliminar la cuenta de Firebase"},
+    },
+)
+def eliminar_cuenta(
+    token: dict = Depends(get_firebase_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    usuario = _usuario_registrado(db, token["uid"])
+    # RESERVA no tiene ON DELETE CASCADE; dispositivos y notificaciones sí
+    db.query(models.Reserva).filter(models.Reserva.usuario_id == usuario.uid).delete()
+    db.delete(usuario)
+    db.flush()
+
+    # Se borra de Firebase antes del commit: si falla, la base queda como estaba
+    try:
+        auth.delete_user(usuario.uid)
+    except auth.UserNotFoundError:
+        pass
+    except exceptions.FirebaseError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo eliminar la cuenta. Intentá de nuevo más tarde.",
+        )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _usuario_registrado(db: Session, uid: str) -> models.Usuario:

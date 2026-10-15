@@ -10,56 +10,66 @@ class ProximaReservaCard extends StatelessWidget {
   final VoidCallback onVerReservas;
   final VoidCallback onReservar;
 
+  /// Se llama al tocar la card cuando hay una reserva
+  final ValueChanged<Reserva> onTap;
+
   const ProximaReservaCard({
     super.key,
     required this.reserva,
     required this.onVerReservas,
     required this.onReservar,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final reserva = this.reserva;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.lightCard,
+    return Material(
+      color: AppColors.lightCard,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.lightBorder),
+        side: const BorderSide(color: AppColors.lightBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: reserva == null ? null : () => onTap(reserva),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Expanded(
-                child: Text(
-                  'PRÓXIMA RESERVA',
-                  style: TextStyle(
-                    color: AppColors.olive,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2.5,
-                  ),
-                ),
-              ),
-              if (reserva != null)
-                GestureDetector(
-                  onTap: onVerReservas,
-                  child: Text(
-                    '${Formatters.diasHasta(reserva.fecha)} →',
-                    style: const TextStyle(
-                      color: AppColors.lightTextSecondary,
-                      fontSize: 12,
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'PRÓXIMA RESERVA',
+                      style: TextStyle(
+                        color: AppColors.olive,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2.5,
+                      ),
                     ),
                   ),
-                ),
+                  if (reserva != null)
+                    GestureDetector(
+                      onTap: onVerReservas,
+                      child: Text(
+                        '${Formatters.diasHasta(reserva.fecha)} →',
+                        style: const TextStyle(
+                          color: AppColors.lightTextSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (reserva == null) _sinReservas() else ..._conReserva(reserva),
             ],
           ),
-          const SizedBox(height: 14),
-          if (reserva == null) _sinReservas() else ..._conReserva(reserva),
-        ],
+        ),
       ),
     );
   }

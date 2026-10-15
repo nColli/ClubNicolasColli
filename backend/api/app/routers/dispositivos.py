@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app import models
@@ -35,11 +36,20 @@ def registrar_dispositivo(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no registrado."
         )
-    db.merge(
-        models.Dispositivo(
-            token=datos.token,
-            usuario_id=token["uid"],
-            actualizado=datetime.now(timezone.utc),
+    # Upsert atómico: al iniciar sesión la app puede registrar el mismo token
+    # dos veces a la vez (getToken y onTokenRefresh), y con un SELECT + INSERT
+    # las dos requests intentarían insertarlo
+    valores = {
+        "token": datos.token,
+        "usuario_id": token["uid"],
+        "actualizado": datetime.now(timezone.utc),
+    }
+    db.execute(
+        insert(models.Dispositivo)
+        .values(**valores)
+        .on_conflict_do_update(
+            index_elements=[models.Dispositivo.token],
+            set_={"usuario_id": valores["usuario_id"], "actualizado": valores["actualizado"]},
         )
     )
     db.commit()

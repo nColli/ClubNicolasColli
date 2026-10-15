@@ -141,6 +141,17 @@ Actualiza nombre, apellido, DNI y fecha de nacimiento del usuario autenticado. E
 | 409 | Ya hay otro usuario con ese DNI |
 | 422 | Datos inválidos (campos vacíos, DNI que no tiene 7 u 8 dígitos, fecha futura) |
 
+### `DELETE /usuarios/me` — Dar de baja la cuenta
+
+Elimina al usuario de la base junto con sus reservas (pasadas y futuras, así los horarios quedan libres), sus dispositivos y sus notificaciones, y borra su cuenta de Firebase. No se puede deshacer.
+
+| Código | Significado |
+|---|---|
+| 204 | Cuenta eliminada |
+| 401 | Falta el token, o es inválido o expiró |
+| 404 | El usuario no está registrado en la base |
+| 502 | No se pudo eliminar la cuenta de Firebase; la base no se modifica |
+
 ### `GET /reservas` — Reservas del usuario autenticado
 
 Query params opcionales:

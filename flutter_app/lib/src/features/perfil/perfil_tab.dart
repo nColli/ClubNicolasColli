@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/src/constants/constants.dart';
 import 'package:flutter_app/src/extensions/extensions.dart';
 import 'package:flutter_app/src/features/perfil/widgets/datos_personales_card.dart';
+import 'package:flutter_app/src/features/perfil/widgets/eliminar_cuenta_card.dart';
 import 'package:flutter_app/src/features/perfil/widgets/opcion_perfil.dart';
 import 'package:flutter_app/src/features/perfil/widgets/perfil_header.dart';
 import 'package:flutter_app/src/models/models.dart';
@@ -12,7 +13,7 @@ import 'package:flutter_app/src/theme/theme.dart';
 import 'package:flutter_app/src/widgets/widgets.dart';
 
 /// Pestaña "Mi perfil": datos del usuario (editables salvo el email),
-/// cambio de contraseña y cierre de sesión.
+/// cambio de contraseña, cierre de sesión y baja de la cuenta.
 class PerfilTab extends StatefulWidget {
   /// Se llama al guardar cambios, para que el resto del home los muestre
   final VoidCallback onPerfilActualizado;
@@ -117,6 +118,25 @@ class _PerfilTabState extends State<PerfilTab> {
     }
   }
 
+  /// El diálogo pide confirmación y envía la baja; si se eliminó la cuenta
+  /// se cierra la sesión y se vuelve al login.
+  Future<void> _eliminarCuenta() async {
+    final eliminada = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const EliminarCuentaDialog(),
+    );
+    if (eliminada != true || !mounted) return;
+
+    // El usuario ya no existe en Firebase; signOut solo limpia la sesión local
+    await _auth.signOut().catchError((_) {});
+    if (!mounted) return;
+    context.showSnackBar('Tu cuenta fue eliminada.');
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final usuario = _usuario;
@@ -192,6 +212,12 @@ class _PerfilTabState extends State<PerfilTab> {
                       ),
                     ),
                   ),
+                  // Solo con el perfil cargado: la API necesita que el
+                  // usuario esté registrado para eliminarlo
+                  if (usuario != null) ...[
+                    const SizedBox(height: 24),
+                    EliminarCuentaCard(onEliminar: _eliminarCuenta),
+                  ],
                 ],
               ),
             ),

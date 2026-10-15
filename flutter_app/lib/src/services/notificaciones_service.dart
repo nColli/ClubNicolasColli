@@ -28,6 +28,12 @@ class NotificacionesService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final ApiService _api = ApiService();
 
+  /// Último token registrado (o registrándose) en la API. Al pedir un token
+  /// nuevo, FCM lo devuelve en [activar] y además lo emite por
+  /// `onTokenRefresh`; con esto se registra una sola vez. Es estático porque
+  /// se crean varias instancias del servicio.
+  static String? _tokenRegistrado;
+
   /// Pide permiso y registra el dispositivo en la API.
   ///
   /// Si falla Firebase Messaging la app sigue sin notificaciones; si falla el
@@ -45,13 +51,13 @@ class NotificacionesService {
       debugPrint('No se pudo obtener el token de FCM: $e');
       return;
     }
-    if (token != null) await _api.registrarDispositivo(token);
+    if (token != null) await _registrar(token);
   }
 
   /// Vuelve a registrar el dispositivo cuando FCM renueva el token.
   StreamSubscription<String> escucharRenovacionDeToken() => _messaging
       .onTokenRefresh
-      .listen((token) => _api.registrarDispositivo(token).catchError((_) {}));
+      .listen((token) => _registrar(token).catchError((_) {}));
 
   /// Deja de recibir avisos en este dispositivo. Se llama antes de cerrar
   /// sesión, mientras todavía hay un usuario autenticado.
@@ -62,6 +68,20 @@ class NotificacionesService {
       await _messaging.deleteToken();
     } catch (_) {
       // Si falla, la API borra el token cuando FCM lo informe como inválido
+    } finally {
+      _tokenRegistrado = null;
+    }
+  }
+
+  Future<void> _registrar(String token) async {
+    if (token == _tokenRegistrado) return;
+    // Se marca antes de la request, para que una llamada simultánea no la repita
+    _tokenRegistrado = token;
+    try {
+      await _api.registrarDispositivo(token);
+    } catch (_) {
+      _tokenRegistrado = null;
+      rethrow;
     }
   }
 

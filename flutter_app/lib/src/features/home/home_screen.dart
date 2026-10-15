@@ -30,9 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Sede cuyo detalle se muestra en la pestaña de sedes (null = lista)
   Sede? _sedeAbierta;
 
-  /// Reserva cuya cancelación se está confirmando en la pestaña de reservas
-  Reserva? _reservaACancelar;
-
   /// Aumenta cada vez que se crea o cancela una reserva, para que las
   /// pestañas que las muestran las vuelvan a cargar
   int _versionReservas = 0;
@@ -44,8 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
   /// creó o canceló una reserva), para actualizar la campana
   int _versionNotificaciones = 0;
 
-  /// La pestaña actual muestra una subpantalla (detalle de sede o
-  /// cancelación) de la que el botón atrás tiene que volver
   @override
   void initState() {
     super.initState();
@@ -110,11 +105,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (cancelada == true && mounted) _reservasCambiaron();
   }
 
-  bool get _enSubpantalla => switch (_tabActual) {
-    HomeTab.sedes => _sedeAbierta != null,
-    HomeTab.reservas => _reservaACancelar != null,
-    _ => false,
-  };
+  /// La pestaña actual muestra una subpantalla (detalle de sede) de la que
+  /// el botón atrás tiene que volver
+  bool get _enSubpantalla =>
+      _tabActual == HomeTab.sedes && _sedeAbierta != null;
 
   void _irATab(HomeTab tab) => setState(() {
     // Tocar la pestaña en la que ya se está vuelve a su pantalla principal
@@ -124,7 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _cerrarSubpantalla() {
     if (_tabActual == HomeTab.sedes) _sedeAbierta = null;
-    if (_tabActual == HomeTab.reservas) _reservaACancelar = null;
   }
 
   void _abrirSede(Sede sede) => setState(() {
@@ -137,17 +130,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _reservasCambiaron() => setState(() {
     _versionReservas++;
     _versionNotificaciones++;
-  });
-
-  void _pedirCancelacion(Reserva reserva) =>
-      setState(() => _reservaACancelar = reserva);
-
-  void _cerrarCancelacion(bool recargar) => setState(() {
-    _reservaACancelar = null;
-    if (recargar) {
-      _versionReservas++;
-      _versionNotificaciones++;
-    }
   });
 
   @override
@@ -181,10 +163,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ReservasTab(
               versionReservas: _versionReservas,
-              reservaACancelar: _reservaACancelar,
-              onCancelar: _pedirCancelacion,
               onAbrirReserva: (r) => _abrirReserva(r.id, r),
-              onCerrarCancelacion: _cerrarCancelacion,
+              onReservaCancelada: _reservasCambiaron,
               onReservar: () => _irATab(HomeTab.sedes),
             ),
             PerfilTab(

@@ -58,6 +58,11 @@ class ApiService {
     return Usuario.fromJson(json);
   }
 
+  /// Da de baja la cuenta: la API borra al usuario de la base y de Firebase.
+  Future<void> eliminarCuenta() async {
+    await _delete('/usuarios/me');
+  }
+
   /// Reservas que todavía no terminaron, de la más cercana a la más lejana.
   /// Devuelve una lista vacía si el usuario no tiene reservas próximas.
   Future<List<Reserva>> obtenerReservasProximas({int? limite}) async {

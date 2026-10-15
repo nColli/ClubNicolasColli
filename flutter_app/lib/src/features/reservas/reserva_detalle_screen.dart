@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_app/src/constants/constants.dart';
 import 'package:flutter_app/src/enums/enums.dart';
-import 'package:flutter_app/src/features/reservas/widgets/cancelar_reserva_view.dart';
+import 'package:flutter_app/src/features/reservas/widgets/cancelar_reserva_dialog.dart';
 import 'package:flutter_app/src/features/reservas/widgets/detalle_reserva_card.dart';
 import 'package:flutter_app/src/features/reservas/widgets/estado_reserva_badge.dart';
 import 'package:flutter_app/src/models/models.dart';
@@ -64,19 +64,9 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
   }
 
   Future<void> _cancelar(Reserva reserva) async {
-    final cambio = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          backgroundColor: AppColors.lightBackground,
-          body: CancelarReservaView(
-            reserva: reserva,
-            onCerrar: (cambio) => Navigator.of(context).pop(cambio),
-          ),
-        ),
-      ),
-    );
+    final cambio = await cancelarReservaConConfirmacion(context, reserva);
     // Cancelada (o ya no se podía cancelar): se vuelve con la lista a recargar
-    if (cambio == true && mounted) Navigator.of(context).pop(true);
+    if (cambio && mounted) Navigator.of(context).pop(true);
   }
 
   @override

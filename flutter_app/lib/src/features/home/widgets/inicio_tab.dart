@@ -24,8 +24,8 @@ class InicioTab extends StatefulWidget {
   final ValueChanged<HomeTab> onIrATab;
   final ValueChanged<Sede> onAbrirSede;
 
-  /// Abre el detalle de una reserva (desde el panel de notificaciones)
-  final ValueChanged<int> onAbrirReserva;
+  /// Abre el detalle de una reserva (la próxima reserva o una notificación)
+  final void Function(int reservaId, [Reserva? reserva]) onAbrirReserva;
 
   const InicioTab({
     super.key,
@@ -169,6 +169,7 @@ class _InicioTabState extends State<InicioTab> {
               child: ProximaReservaCard(
                 reserva: _proximaReserva,
                 onVerReservas: () => widget.onIrATab(HomeTab.reservas),
+                onTap: (r) => widget.onAbrirReserva(r.id, r),
                 onReservar: () => widget.onIrATab(HomeTab.sedes),
               ),
             ),
