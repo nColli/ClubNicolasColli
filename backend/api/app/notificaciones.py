@@ -80,7 +80,8 @@ def enviar_avisos_pendientes(db: Session) -> None:
                 "Tu reserva es hoy" if reserva.fecha == ahora.date() else "Tu reserva es mañana",
             )
         elif not reserva.aviso_1h_enviado and timedelta(0) < falta <= timedelta(hours=1):
-            reserva.aviso_1h_enviado = True
+            # El de 24 h ya no corresponde: se marca para no volver a revisarlo
+            reserva.aviso_24h_enviado = reserva.aviso_1h_enviado = True
             minutos = round(falta.total_seconds() / 60)
             _avisar(
                 db,
@@ -89,6 +90,12 @@ def enviar_avisos_pendientes(db: Session) -> None:
                 if minutos >= 55
                 else f"Tu reserva empieza en {max(minutos, 1)} minutos",
             )
+        elif falta <= timedelta(0):
+            # Ya empezó (por ejemplo, si la API estuvo apagada): los avisos que
+            # faltaban ya no corresponden
+            reserva.aviso_24h_enviado = reserva.aviso_1h_enviado = True
+
+    db.commit()
 
 
 def _avisar(db: Session, reserva: models.Reserva, titulo: str) -> None:
