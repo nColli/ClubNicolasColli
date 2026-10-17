@@ -1,3 +1,6 @@
+-- Crea la base desde cero (¡borra las tablas y sus datos!):
+--   python run_schema.py
+
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 DROP TABLE IF EXISTS NOTIFICACION;
 DROP TABLE IF EXISTS DISPOSITIVO;
@@ -59,13 +62,11 @@ CREATE TABLE IF NOT EXISTS RESERVA (
   )
 );
 
--- Dispositivos donde el usuario recibe notificaciones push (token de FCM).
--- Un token identifica una instalación de la app; si otro usuario inicia sesión
--- en el mismo dispositivo, el token pasa a ser suyo.
+-- Celulares donde el usuario recibe notificaciones push (token de FCM).
+-- Si otro usuario inicia sesión en el mismo celular, el token pasa a ser suyo.
 CREATE TABLE IF NOT EXISTS DISPOSITIVO (
   token        VARCHAR(512) PRIMARY KEY,
-  usuario_id   VARCHAR(255) NOT NULL REFERENCES USUARIO(uid) ON DELETE CASCADE,
-  actualizado  TIMESTAMPTZ NOT NULL DEFAULT now()
+  usuario_id   VARCHAR(255) NOT NULL REFERENCES USUARIO(uid) ON DELETE CASCADE
 );
 
 -- Notificaciones que el usuario ve en la app (la campana del inicio): las de

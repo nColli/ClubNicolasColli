@@ -37,17 +37,15 @@ class HomeHero extends StatelessWidget {
             errorBuilder: (_, _, _) =>
                 Container(color: AppColors.heroPlaceholder),
           ),
-          // Oscurece arriba y se funde con el fondo claro abajo
+          // Oscurece la foto para que se lea el texto blanco
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: const [0, 0.65, 1],
                 colors: [
                   Colors.black.withValues(alpha: 0.75),
-                  Colors.black.withValues(alpha: 0.35),
-                  AppColors.lightBackground,
+                  Colors.black.withValues(alpha: 0.4),
                 ],
               ),
             ),

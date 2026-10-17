@@ -1,23 +1,28 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    EmailStr,
-    Field,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class DatosPersonales(BaseModel):
-    """Datos del perfil que el usuario carga al registrarse y puede editar."""
+    """Datos del perfil que el usuario carga al registrarse y puede editar. El
+    uid y el email no se envían: salen del token de Firebase."""
 
     nombre: str = Field(min_length=1, max_length=255)
     apellido: str = Field(min_length=1, max_length=255)
     dni: str = Field(pattern=r"^\d{7,8}$", description="7 u 8 dígitos, sin puntos")
     fecha_nacimiento: date
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "nombre": "Juana",
+                "apellido": "González",
+                "dni": "40123456",
+                "fecha_nacimiento": "2000-05-21",
+            }
+        }
+    }
 
     @field_validator("dni", mode="before")
     @classmethod
@@ -40,39 +45,6 @@ class DatosPersonales(BaseModel):
         return v
 
 
-class UsuarioCreate(DatosPersonales):
-    uid: str = Field(min_length=1, max_length=255, description="UID de Firebase")
-    email: EmailStr
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "uid": "Xb3kP9...firebaseUid",
-                "email": "juana@example.com",
-                "nombre": "Juana",
-                "apellido": "González",
-                "dni": "40123456",
-                "fecha_nacimiento": "2000-05-21",
-            }
-        }
-    }
-
-
-class UsuarioUpdate(DatosPersonales):
-    """El email no se puede editar: es el de la cuenta de Firebase."""
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "nombre": "Juana",
-                "apellido": "González",
-                "dni": "40123456",
-                "fecha_nacimiento": "2000-05-21",
-            }
-        }
-    }
-
-
 class Usuario(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -80,9 +52,7 @@ class Usuario(BaseModel):
     email: EmailStr
     nombre: str
     apellido: str
-    dni: str | None = Field(
-        description="null solo en usuarios registrados antes de que se pidiera el DNI"
-    )
+    dni: str
     fecha_nacimiento: date
 
 
@@ -181,10 +151,6 @@ class Notificacion(BaseModel):
 
 class DispositivoCreate(BaseModel):
     token: str = Field(min_length=1, max_length=512, description="Token de FCM del dispositivo")
-
-
-class ResultadoAvisos(BaseModel):
-    enviados: int = Field(description="Avisos de reserva enviados en esta ejecución")
 
 
 class ErrorResponse(BaseModel):

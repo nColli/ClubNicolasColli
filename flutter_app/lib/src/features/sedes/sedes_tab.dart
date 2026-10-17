@@ -1,29 +1,17 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_app/src/constants/constants.dart';
-import 'package:flutter_app/src/features/sedes/widgets/sede_detalle.dart';
 import 'package:flutter_app/src/features/sedes/widgets/sedes_header.dart';
 import 'package:flutter_app/src/models/models.dart';
+import 'package:flutter_app/src/routing/routing.dart';
 import 'package:flutter_app/src/services/services.dart';
 import 'package:flutter_app/src/theme/theme.dart';
 import 'package:flutter_app/src/widgets/widgets.dart';
 
-/// Pestaña de sedes: muestra la lista de sedes o, si hay una abierta, su
-/// detalle. La sede abierta la controla el home, para poder abrirla también
-/// desde la pestaña de inicio.
+/// Pestaña de sedes: lista de sedes filtrable por deporte. Al tocar una se
+/// abre su detalle en otra pantalla.
 class SedesTab extends StatefulWidget {
-  final Sede? sedeAbierta;
-  final ValueChanged<Sede> onAbrirSede;
-  final VoidCallback onCerrarSede;
-  final VoidCallback onReservaCreada;
-
-  const SedesTab({
-    super.key,
-    required this.sedeAbierta,
-    required this.onAbrirSede,
-    required this.onCerrarSede,
-    required this.onReservaCreada,
-  });
+  const SedesTab({super.key});
 
   @override
   State<SedesTab> createState() => _SedesTabState();
@@ -69,30 +57,16 @@ class _SedesTabState extends State<SedesTab> {
       ? _sedes
       : _sedes.where((s) => s.deportes.contains(_deporteSeleccionado)).toList();
 
-  @override
-  Widget build(BuildContext context) {
-    final sede = widget.sedeAbierta;
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
-      child: sede == null
-          ? _lista()
-          : SedeDetalle(
-              key: ValueKey(sede.id),
-              sede: sede,
-              onVolver: widget.onCerrarSede,
-              onReservaCreada: widget.onReservaCreada,
-            ),
-    );
+  void _abrirSede(Sede sede) {
+    Navigator.of(context).pushNamed(AppRoutes.sedeDetalle, arguments: sede);
   }
 
-  Widget _lista() {
+  @override
+  Widget build(BuildContext context) {
     return RefreshIndicator(
-      key: const ValueKey('lista'),
       color: AppColors.olive,
       onRefresh: _cargar,
       child: ListView(
-        // Conserva el scroll al volver del detalle de una sede
-        key: const PageStorageKey('lista_sedes'),
         padding: const EdgeInsets.only(bottom: 110),
         children: [
           const SedesHeader(),
@@ -132,7 +106,7 @@ class _SedesTabState extends State<SedesTab> {
                 child: SedeCard(
                   sede: sede,
                   expandida: true,
-                  onTap: () => widget.onAbrirSede(sede),
+                  onTap: () => _abrirSede(sede),
                 ),
               ),
           ],

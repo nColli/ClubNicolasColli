@@ -17,8 +17,4 @@ void main() {
     expect(usuario.dni, '40123456');
     expect(usuario.iniciales, 'JG');
   });
-
-  test('un usuario registrado antes del DNI lo tiene en null', () {
-    expect(Usuario.fromJson({...json, 'dni': null}).dni, isNull);
-  });
 }

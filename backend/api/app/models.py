@@ -28,15 +28,8 @@ class Usuario(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True)
     nombre: Mapped[str] = mapped_column(String(255))
     apellido: Mapped[str] = mapped_column(String(255))
-    # Opcional solo para los usuarios creados antes de que se pidiera el DNI
-    # (ver database/migracion_002_dni_usuario.sql)
-    dni: Mapped[str | None] = mapped_column(String(8), unique=True)
+    dni: Mapped[str] = mapped_column(String(8), unique=True)
     fecha_nacimiento: Mapped[date] = mapped_column(Date)
-
-    reservas: Mapped[list["Reserva"]] = relationship(back_populates="usuario")
-    dispositivos: Mapped[list["Dispositivo"]] = relationship(
-        back_populates="usuario", passive_deletes=True
-    )
 
 
 class Sede(Base):
@@ -48,9 +41,6 @@ class Sede(Base):
     imagen_url: Mapped[str | None] = mapped_column(String(500))
 
     horarios: Mapped[list["HorarioSede"]] = relationship(
-        back_populates="sede",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
         order_by="(HorarioSede.dia_semana, HorarioSede.hora_apertura)",
     )
     espacios: Mapped[list["EspacioDeportivo"]] = relationship(back_populates="sede")
@@ -65,8 +55,6 @@ class HorarioSede(Base):
     hora_apertura: Mapped[int] = mapped_column(SmallInteger)  # 0 a 23
     hora_cierre: Mapped[int] = mapped_column(SmallInteger)  # 1 a 24
 
-    sede: Mapped[Sede] = relationship(back_populates="horarios")
-
 
 class EspacioDeportivo(Base):
     __tablename__ = "espacio_deportivo"
@@ -80,7 +68,6 @@ class EspacioDeportivo(Base):
     precio_hora: Mapped[Decimal] = mapped_column(Numeric(10, 2))
 
     sede: Mapped[Sede] = relationship(back_populates="espacios")
-    reservas: Mapped[list["Reserva"]] = relationship(back_populates="espacio")
 
 
 class Reserva(Base):
@@ -97,12 +84,11 @@ class Reserva(Base):
     aviso_24h_enviado: Mapped[bool] = mapped_column(Boolean, default=False)
     aviso_1h_enviado: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    espacio: Mapped[EspacioDeportivo] = relationship(back_populates="reservas")
-    usuario: Mapped[Usuario] = relationship(back_populates="reservas")
+    espacio: Mapped[EspacioDeportivo] = relationship()
 
 
 class Dispositivo(Base):
-    """Instalación de la app donde el usuario recibe notificaciones push."""
+    """Celular donde el usuario recibe notificaciones push."""
 
     __tablename__ = "dispositivo"
 
@@ -110,9 +96,6 @@ class Dispositivo(Base):
     usuario_id: Mapped[str] = mapped_column(
         ForeignKey("usuario.uid", ondelete="CASCADE")
     )
-    actualizado: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-    usuario: Mapped[Usuario] = relationship(back_populates="dispositivos")
 
 
 class Notificacion(Base):
@@ -124,7 +107,7 @@ class Notificacion(Base):
     usuario_id: Mapped[str] = mapped_column(
         ForeignKey("usuario.uid", ondelete="CASCADE")
     )
-    # NULL si la reserva se canceló (o la notificación no es de una reserva)
+    # NULL si la reserva se canceló
     reserva_id: Mapped[int | None] = mapped_column(
         ForeignKey("reserva.id", ondelete="SET NULL")
     )

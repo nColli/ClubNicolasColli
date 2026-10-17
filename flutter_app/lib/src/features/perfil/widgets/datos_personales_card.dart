@@ -69,7 +69,7 @@ class _DatosPersonalesCardState extends State<DatosPersonalesCard> {
   void _mostrar(Usuario usuario) {
     _nombreController.text = usuario.nombre;
     _apellidoController.text = usuario.apellido;
-    _dniController.text = usuario.dni ?? '';
+    _dniController.text = usuario.dni;
     _emailController.text = usuario.email;
     _fechaNacimiento = usuario.fechaNacimiento;
     _fechaController.text = Formatters.fechaNumerica(usuario.fechaNacimiento);
@@ -223,8 +223,6 @@ class _DatosPersonalesCardState extends State<DatosPersonalesCard> {
             const SizedBox(height: 14),
             CampoPerfil(
               label: 'DNI',
-              // Usuarios registrados antes de que se pidiera el DNI
-              nota: widget.usuario.dni == null ? '(cargalo con Editar)' : null,
               controller: _dniController,
               habilitado: habilitado,
               keyboardType: TextInputType.number,

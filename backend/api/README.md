@@ -2,83 +2,20 @@
 
 API en **FastAPI** + **PostgreSQL** (acceso a datos con **SQLAlchemy 2**). La autenticación la hace **Firebase Auth**: la app Flutter manda el ID token de Firebase y la API lo verifica.
 
-## Requisitos
+## Instalación, configuración y despliegue
 
-- Python 3.12+
-- Una base PostgreSQL (local o en Render)
-- Un proyecto de Firebase con una **cuenta de servicio**: Firebase Console → Configuración del proyecto → Cuentas de servicio → *Generar nueva clave privada*
+Los pasos para configurar Firebase, crear la base en Render, instalar dependencias, completar el `.env`, ejecutar `run_schema.py`, correr la API en local y desplegarla en Render están en [../README.md](../README.md).
 
-## Configuración
-
-```bash
-cd backend/api
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # y completar los valores
-```
-
-Variables de `.env`:
-
-| Variable | Descripción |
-|---|---|
-| `DATABASE_URL` | URL de conexión a PostgreSQL (si falta `sslmode`, se agrega `sslmode=require`) |
-| `FIREBASE_CREDENTIALS_PATH` | Ruta al JSON de la cuenta de servicio (para usar en local) |
-| `FIREBASE_CREDENTIALS_JSON` | Contenido del JSON en una línea (para usar en Render, en lugar del path) |
-| `AVISOS_INTERVALO_SEGUNDOS` | Cada cuántos segundos la API revisa si hay avisos de reservas para enviar (por defecto `300`; `0` lo desactiva) |
-| `CRON_SECRET` | Secreto para `POST /notificaciones/enviar-pendientes` (opcional; sin él, el endpoint responde 403) |
-
-## Base de datos
-
-La fuente de verdad del schema es [`../database/schema.sql`](../database/schema.sql). Los modelos de `app/models.py` solo mapean esas tablas para consultarlas desde la API; la API no crea ni modifica tablas.
-
-Los scripts SQL se ejecutan con `run_schema.py` (usa el `DATABASE_URL` del `.env` de `backend/database`):
-
-```bash
-cd backend/database
-python run_schema.py              # ejecuta schema.sql (¡borra y recrea las tablas!)
-python run_schema.py seed.sql     # carga sedes, horarios y espacios de prueba (no usar en producción)
-```
-
-Si la base se creó antes de alguno de estos cambios, ejecutar las migraciones que falten, en orden:
-
-```bash
-python run_schema.py migracion_002_dni_usuario.sql
-python run_schema.py migracion_003_notificaciones.sql
-python run_schema.py migracion_004_notificaciones_app.sql
-```
-
-Para cambiar el schema:
-
-1. Modificar `schema.sql`.
-2. Si hay una base con datos que no se quiere recrear, escribir un script de migración (`migracion_NNN_descripcion.sql`, ver `migracion_002_dni_usuario.sql`) y ejecutarlo con `python run_schema.py migracion_NNN_descripcion.sql`.
-3. Actualizar el modelo correspondiente en `app/models.py`.
-
-## Ejecutar
-
-```bash
-fastapi dev app/main.py        # desarrollo, con recarga automática
-```
-
-- Swagger UI: http://localhost:8000/docs
-- OpenAPI JSON: http://localhost:8000/openapi.json
-
-## Despliegue en Render
-
-- **Build command:** `pip install -r requirements.txt`
-- **Start command:** `fastapi run app/main.py --port $PORT`
-- **Root directory:** `backend/api`
-- Variables de entorno: `DATABASE_URL` (Internal Database URL de Render), `FIREBASE_CREDENTIALS_JSON` y `CRON_SECRET`
-- En el plan free, Render suspende el servicio después de 15 minutos sin tráfico, y mientras está suspendido no se envían avisos. Para que lleguen siempre, configurar un cron externo gratuito (por ejemplo [cron-job.org](https://cron-job.org)) que cada 5 minutos haga `POST https://<tu-api>.onrender.com/notificaciones/enviar-pendientes` con el header `X-Cron-Secret: <CRON_SECRET>`.
+Con la API corriendo, la documentación interactiva queda en `/docs` (Swagger UI) y la especificación en `/openapi.json`.
 
 ## Notificaciones push
 
 La API envía por Firebase Cloud Messaging un aviso **24 horas** y otro **1 hora** antes del inicio de cada reserva, a todos los dispositivos del usuario. El aviso incluye sede, espacio, fecha y horario, y en `data` el `reserva_id` para que la app abra el detalle al tocarlo.
 
-- Una tarea dentro de la API revisa cada `AVISOS_INTERVALO_SEGUNDOS` qué reservas entraron en la ventana de un aviso. El de 24 h se envía entre 24 h y 23 h antes del inicio; el de 1 h, en la última hora. Si la API estuvo suspendida y se pasó la ventana, ese aviso se saltea; una reserva hecha con menos de 24 h de anticipación solo recibe el de 1 h.
-- Cada aviso se marca como enviado en `RESERVA` (`aviso_24h_enviado`, `aviso_1h_enviado`) antes de enviarlo, así no se repite aunque la tarea y el cron corran a la vez.
+- Una tarea dentro de la API revisa cada 5 minutos (configurable con `AVISOS_INTERVALO_SEGUNDOS` en el `.env`) qué reservas entraron en la ventana de un aviso. El de 24 h se envía en cuanto faltan 24 h o menos para el inicio, así que una reserva hecha con menos anticipación (o una que la API no llegó a revisar por estar suspendida) lo recibe en la siguiente revisión, con el título "Tu reserva es hoy" o "Tu reserva es mañana" según el día. Si ya falta 1 h o menos, solo se envía el de 1 h, que se envía en la última hora.
+- Cada aviso se marca como enviado en `RESERVA` (`aviso_24h_enviado`, `aviso_1h_enviado`) antes de mandar el push, así no se repite.
 - Además del push, cada aviso queda guardado en `NOTIFICACION` junto con las reservas confirmadas y canceladas; la app las muestra en la campana del inicio (`GET /notificaciones`).
-- La app registra el token de FCM con `POST /dispositivos` al iniciar sesión y lo quita con `DELETE /dispositivos` al cerrarla. Los tokens que FCM informa como inválidos se borran.
+- La app registra el token de FCM con `POST /dispositivos` cada vez que se abre con sesión iniciada. Al cerrar sesión borra el token en el celular; los tokens que FCM informa como inválidos se borran de la base en el siguiente envío.
 
 ## Autenticación
 
@@ -94,12 +31,10 @@ En Flutter el token se obtiene con `await FirebaseAuth.instance.currentUser!.get
 
 ### `POST /usuarios` — Registrar usuario
 
-Se llama justo después de `createUserWithEmailAndPassword`. El `uid` y el `email` del body tienen que coincidir con los del token.
+Se llama justo después de `createUserWithEmailAndPassword`. El `uid` y el `email` se toman del token.
 
 ```json
 {
-  "uid": "Xb3kP9...",
-  "email": "juana@example.com",
   "nombre": "Juana",
   "apellido": "González",
   "dni": "40123456",
@@ -111,9 +46,8 @@ Se llama justo después de `createUserWithEmailAndPassword`. El `uid` y el `emai
 |---|---|
 | 201 | Usuario creado; devuelve el usuario |
 | 401 | Falta el token, o es inválido o expiró |
-| 403 | El uid o el email no coinciden con el token |
 | 409 | Usuario ya registrado, o ya hay otro usuario con ese DNI |
-| 422 | Datos inválidos (campos vacíos, DNI que no tiene 7 u 8 dígitos, fecha futura, email mal formado) |
+| 422 | Datos inválidos (campos vacíos, DNI que no tiene 7 u 8 dígitos, fecha futura) |
 
 ### `GET /usuarios/me` — Perfil del usuario autenticado
 
@@ -122,8 +56,6 @@ Se llama justo después de `createUserWithEmailAndPassword`. El `uid` y el `emai
 | 200 | Devuelve el usuario |
 | 401 | Falta el token, o es inválido o expiró |
 | 404 | El usuario no está registrado en la base |
-
-`dni` puede venir en `null` solo para usuarios registrados antes de que se pidiera el DNI; lo cargan editando el perfil.
 
 ### `PUT /usuarios/me` — Editar el perfil
 
@@ -264,15 +196,11 @@ No requiere autenticación. Devuelve cada hora en que la sede está abierta ese 
 
 ### `POST /dispositivos` — Registrar un dispositivo para notificaciones
 
-Guarda el token de FCM del dispositivo del usuario autenticado. Si el token ya estaba registrado (por ejemplo, por otro usuario en el mismo celular), pasa a ser del usuario autenticado. Responde 204; 404 si el usuario no está registrado.
+Guarda el token de FCM del celular del usuario autenticado. La app lo llama en cada inicio: si el token ya estaba registrado no se duplica, y si era de otro usuario (en el mismo celular) pasa a ser del usuario autenticado. Responde 204; 404 si el usuario no está registrado.
 
 ```json
 { "token": "<token de FCM>" }
 ```
-
-### `DELETE /dispositivos?token=<token de FCM>` — Quitar un dispositivo
-
-Deja de enviar notificaciones a ese dispositivo (la app lo llama al cerrar sesión). Responde 204.
 
 ### `GET /notificaciones` — Notificaciones del usuario
 
@@ -294,7 +222,3 @@ Devuelve las notificaciones del usuario autenticado (reservas confirmadas y canc
 ### `POST /notificaciones/leidas` — Marcar todas como leídas
 
 Marca como leídas todas las notificaciones del usuario autenticado. Responde 204.
-
-### `POST /notificaciones/enviar-pendientes` — Enviar avisos de reservas próximas
-
-Envía los avisos que correspondan en ese momento y devuelve `{ "enviados": <cantidad> }`. La API ya lo hace sola; este endpoint es para un cron externo (ver *Despliegue en Render*). Requiere el header `X-Cron-Secret` igual a la variable `CRON_SECRET`; si no coincide, responde 403.

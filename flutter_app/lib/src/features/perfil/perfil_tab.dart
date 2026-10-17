@@ -15,10 +15,7 @@ import 'package:flutter_app/src/widgets/widgets.dart';
 /// Pestaña "Mi perfil": datos del usuario (editables salvo el email),
 /// cambio de contraseña, cierre de sesión y baja de la cuenta.
 class PerfilTab extends StatefulWidget {
-  /// Se llama al guardar cambios, para que el resto del home los muestre
-  final VoidCallback onPerfilActualizado;
-
-  const PerfilTab({super.key, required this.onPerfilActualizado});
+  const PerfilTab({super.key});
 
   @override
   State<PerfilTab> createState() => _PerfilTabState();
@@ -53,11 +50,6 @@ class _PerfilTabState extends State<PerfilTab> {
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
-  }
-
-  void _guardado(Usuario usuario) {
-    setState(() => _usuario = usuario);
-    widget.onPerfilActualizado();
   }
 
   /// Usa el mismo flujo que "¿Olvidaste tu contraseña?": Firebase envía un
@@ -106,7 +98,7 @@ class _PerfilTabState extends State<PerfilTab> {
     if (confirmar != true || !mounted) return;
 
     try {
-      // Antes de cerrar sesión, porque quitar el dispositivo requiere el token
+      // Deja de recibir push de este usuario en el celular
       await NotificacionesService().desactivar();
       await _auth.signOut();
       if (!mounted) return;
@@ -158,7 +150,7 @@ class _PerfilTabState extends State<PerfilTab> {
                     primero: 'MI ',
                     segundo: 'PERFIL',
                     colorPrimero: AppColors.lightTextPrimary,
-                    colorSegundo: AppColors.neonYellow,
+                    colorSegundo: AppColors.olive,
                   ),
                   const SizedBox(height: 20),
                   if (_cargando && usuario == null)
@@ -181,7 +173,7 @@ class _PerfilTabState extends State<PerfilTab> {
                     const SizedBox(height: 20),
                     DatosPersonalesCard(
                       usuario: usuario,
-                      onGuardado: _guardado,
+                      onGuardado: (u) => setState(() => _usuario = u),
                     ),
                     const SizedBox(height: 12),
                     OpcionPerfil(

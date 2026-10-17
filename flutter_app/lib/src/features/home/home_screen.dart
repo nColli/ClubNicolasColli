@@ -1,19 +1,23 @@
 import 'dart:async';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_app/src/enums/enums.dart';
-import 'package:flutter_app/src/extensions/extensions.dart';
 import 'package:flutter_app/src/features/home/widgets/home_bottom_nav.dart';
 import 'package:flutter_app/src/features/home/widgets/inicio_tab.dart';
 import 'package:flutter_app/src/features/perfil/perfil.dart';
 import 'package:flutter_app/src/features/reservas/reservas.dart';
 import 'package:flutter_app/src/features/sedes/sedes.dart';
-import 'package:flutter_app/src/models/models.dart';
 import 'package:flutter_app/src/routing/routing.dart';
 import 'package:flutter_app/src/services/services.dart';
 import 'package:flutter_app/src/theme/theme.dart';
 
+/// Pantalla principal con la barra de pestañas.
+///
+/// Solo se muestra la pestaña actual: al cambiar de pestaña la anterior se
+/// descarta y la nueva se crea de cero, así cada una pide sus datos a la API
+/// cada vez que se entra (siempre muestra la información actualizada).
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -22,29 +26,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final NotificacionesService _notificaciones = NotificacionesService();
-  final List<StreamSubscription<Object>> _suscripciones = [];
+  final List<StreamSubscription<RemoteMessage>> _suscripciones = [];
 
   HomeTab _tabActual = HomeTab.inicio;
-
-  /// Sede cuyo detalle se muestra en la pestaña de sedes (null = lista)
-  Sede? _sedeAbierta;
-
-  /// Aumenta cada vez que se crea o cancela una reserva, para que las
-  /// pestañas que las muestran las vuelvan a cargar
-  int _versionReservas = 0;
-
-  /// Aumenta al editar el perfil, para que el inicio actualice el saludo
-  int _versionPerfil = 0;
-
-  /// Aumenta cuando puede haber notificaciones nuevas (llegó un aviso, se
-  /// creó o canceló una reserva), para actualizar la campana
-  int _versionNotificaciones = 0;
 
   @override
   void initState() {
     super.initState();
-    _activarNotificaciones();
+    _escucharNotificaciones();
   }
 
   @override
@@ -56,127 +45,56 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// El home es la primera pantalla con sesión iniciada: acá se registra el
-  /// dispositivo para recibir avisos y se atienden las notificaciones tocadas.
-  Future<void> _activarNotificaciones() async {
+  /// celular para recibir push y se atienden los avisos según el estado de
+  /// la app.
+  Future<void> _escucharNotificaciones() async {
+    final notificaciones = NotificacionesService();
+    // Antes de pedir el permiso, así el canal de los avisos ya existe cuando
+    // llega el primer push
+    await notificaciones.inicializar(onTocar: _abrirReserva);
+    notificaciones.activar();
     _suscripciones.addAll([
-      _notificaciones.escucharRenovacionDeToken(),
-      _notificaciones.reservasAbiertas.listen(_abrirReserva),
-      _notificaciones.avisosEnPrimerPlano.listen(_mostrarAviso),
+      // App en segundo plano: Android muestra el aviso y el usuario lo tocó
+      FirebaseMessaging.onMessageOpenedApp.listen(_abrirReservaDelAviso),
+      // App abierta: Android no muestra el aviso, lo muestra la app
+      FirebaseMessaging.onMessage.listen(notificaciones.mostrar),
     ]);
-    // La app estaba cerrada y se abrió tocando una notificación
-    final reservaId = await _notificaciones.reservaQueAbrioLaApp();
-    if (reservaId != null && mounted) _abrirReserva(reservaId);
+    // App cerrada: se abrió tocando un aviso
     try {
-      await _notificaciones.activar();
-    } on ApiException catch (e) {
-      if (mounted) {
-        context.showSnackBar(
-          'No se pudieron activar las notificaciones. ${e.mensaje}',
-        );
-      }
+      final mensaje = await FirebaseMessaging.instance.getInitialMessage();
+      if (mensaje != null) _abrirReservaDelAviso(mensaje);
+    } catch (_) {
+      // Sin Firebase Messaging disponible la app sigue sin notificaciones
     }
   }
 
-  void _mostrarAviso(AvisoReserva aviso) {
-    setState(() => _versionNotificaciones++);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 6),
-        content: Text(
-          aviso.cuerpo.isEmpty
-              ? aviso.titulo
-              : '${aviso.titulo}\n${aviso.cuerpo}',
-        ),
-        action: SnackBarAction(
-          label: 'VER',
-          textColor: AppColors.neonYellow,
-          onPressed: () => _abrirReserva(aviso.reservaId),
-        ),
-      ),
-    );
-  }
+  void _abrirReservaDelAviso(RemoteMessage mensaje) =>
+      _abrirReserva(NotificacionesService.reservaId(mensaje));
 
-  /// Abre el detalle de una reserva (desde una notificación o la lista).
-  Future<void> _abrirReserva(int reservaId, [Reserva? reserva]) async {
-    final cancelada = await Navigator.of(context).pushNamed<bool>(
+  void _abrirReserva(int? reservaId) {
+    if (reservaId == null || !mounted) return;
+    Navigator.of(context).pushNamed(
       AppRoutes.reservaDetalle,
-      arguments: ReservaDetalleArgs(reservaId: reservaId, reserva: reserva),
+      arguments: ReservaDetalleArgs(reservaId: reservaId),
     );
-    if (cancelada == true && mounted) _reservasCambiaron();
   }
 
-  /// La pestaña actual muestra una subpantalla (detalle de sede) de la que
-  /// el botón atrás tiene que volver
-  bool get _enSubpantalla =>
-      _tabActual == HomeTab.sedes && _sedeAbierta != null;
-
-  void _irATab(HomeTab tab) => setState(() {
-    // Tocar la pestaña en la que ya se está vuelve a su pantalla principal
-    if (tab == _tabActual) _cerrarSubpantalla();
-    _tabActual = tab;
-  });
-
-  void _cerrarSubpantalla() {
-    if (_tabActual == HomeTab.sedes) _sedeAbierta = null;
-  }
-
-  void _abrirSede(Sede sede) => setState(() {
-    _sedeAbierta = sede;
-    _tabActual = HomeTab.sedes;
-  });
-
-  void _cerrarSede() => setState(() => _sedeAbierta = null);
-
-  void _reservasCambiaron() => setState(() {
-    _versionReservas++;
-    _versionNotificaciones++;
-  });
+  void _irATab(HomeTab tab) => setState(() => _tabActual = tab);
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      // El botón atrás cierra la subpantalla antes de salir de la app
-      canPop: !_enSubpantalla,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) setState(_cerrarSubpantalla);
+    return Scaffold(
+      backgroundColor: AppColors.lightBackground,
+      extendBody: true,
+      body: switch (_tabActual) {
+        HomeTab.inicio => InicioTab(onIrATab: _irATab),
+        HomeTab.sedes => const SedesTab(),
+        HomeTab.reservas => ReservasTab(
+          onReservar: () => _irATab(HomeTab.sedes),
+        ),
+        HomeTab.perfil => const PerfilTab(),
       },
-      child: Scaffold(
-        backgroundColor: AppColors.lightBackground,
-        extendBody: true,
-        body: IndexedStack(
-          // El orden de los hijos sigue el orden de HomeTab.values
-          index: _tabActual.index,
-          children: [
-            InicioTab(
-              versionReservas: _versionReservas,
-              versionPerfil: _versionPerfil,
-              versionNotificaciones: _versionNotificaciones,
-              onIrATab: _irATab,
-              onAbrirSede: _abrirSede,
-              onAbrirReserva: _abrirReserva,
-            ),
-            SedesTab(
-              sedeAbierta: _sedeAbierta,
-              onAbrirSede: _abrirSede,
-              onCerrarSede: _cerrarSede,
-              onReservaCreada: _reservasCambiaron,
-            ),
-            ReservasTab(
-              versionReservas: _versionReservas,
-              onAbrirReserva: (r) => _abrirReserva(r.id, r),
-              onReservaCancelada: _reservasCambiaron,
-              onReservar: () => _irATab(HomeTab.sedes),
-            ),
-            PerfilTab(
-              onPerfilActualizado: () => setState(() => _versionPerfil++),
-            ),
-          ],
-        ),
-        bottomNavigationBar: HomeBottomNav(
-          tabActual: _tabActual,
-          onTap: _irATab,
-        ),
-      ),
+      bottomNavigationBar: HomeBottomNav(tabActual: _tabActual, onTap: _irATab),
     );
   }
 }

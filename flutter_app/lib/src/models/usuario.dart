@@ -3,9 +3,7 @@ class Usuario {
   final String email;
   final String nombre;
   final String apellido;
-
-  /// null solo en usuarios registrados antes de que se pidiera el DNI
-  final String? dni;
+  final String dni;
   final DateTime fechaNacimiento;
 
   const Usuario({

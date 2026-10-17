@@ -1,4 +1,3 @@
-import json
 import os
 
 import firebase_admin
@@ -10,20 +9,23 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def init_firebase() -> None:
-    if firebase_admin._apps:
-        return
+    """Inicializa Firebase Admin con la cuenta de servicio, a partir de los tres
+    datos del JSON que hacen falta (así el JSON no se sube al repositorio)."""
+    variables = ("FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY")
+    faltan = [v for v in variables if not os.getenv(v)]
+    if faltan:
+        raise RuntimeError(f"Faltan variables de entorno: {', '.join(faltan)}")
 
-    cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
-    cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
-
-    if cred_json:
-        cred = credentials.Certificate(json.loads(cred_json))
-    elif cred_path:
-        cred = credentials.Certificate(cred_path)
-    else:
-        raise RuntimeError(
-            "Falta FIREBASE_CREDENTIALS_JSON o FIREBASE_CREDENTIALS_PATH en el archivo .env"
-        )
+    cred = credentials.Certificate(
+        {
+            "type": "service_account",
+            "project_id": os.environ["FIREBASE_PROJECT_ID"],
+            "client_email": os.environ["FIREBASE_CLIENT_EMAIL"],
+            # Si la clave se cargó en una sola línea, los saltos vienen como "\n"
+            "private_key": os.environ["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n"),
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+    )
     firebase_admin.initialize_app(cred)
 
 

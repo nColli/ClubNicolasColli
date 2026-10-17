@@ -14,20 +14,14 @@ class ApiService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// Registra en el backend el perfil del usuario autenticado en Firebase.
+  /// La API toma el uid y el email del token.
   Future<void> registrarUsuario({
     required String nombre,
     required String apellido,
     required String dni,
     required DateTime fechaNacimiento,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw const ApiException('No hay una sesión iniciada.');
-    }
-
     await _post('/usuarios', {
-      'uid': user.uid,
-      'email': user.email,
       'nombre': nombre,
       'apellido': apellido,
       'dni': dni,
@@ -101,11 +95,6 @@ class ApiService {
   /// Registra el token de FCM del dispositivo para recibir avisos de reservas.
   Future<void> registrarDispositivo(String token) async {
     await _post('/dispositivos', {'token': token});
-  }
-
-  /// Deja de enviar avisos a este dispositivo (al cerrar sesión).
-  Future<void> quitarDispositivo(String token) async {
-    await _delete('/dispositivos?token=${Uri.encodeQueryComponent(token)}');
   }
 
   /// Sedes con sus horarios y los deportes que ofrecen.

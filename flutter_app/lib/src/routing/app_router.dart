@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/src/features/auth/auth.dart';
 import 'package:flutter_app/src/features/home/home.dart';
 import 'package:flutter_app/src/features/reservas/reservas.dart';
+import 'package:flutter_app/src/features/sedes/sedes.dart';
 import 'package:flutter_app/src/models/models.dart';
 
 /// Nombres de las rutas de la app.
@@ -11,6 +12,7 @@ abstract final class AppRoutes {
   static const String register = '/register';
   static const String resetPassword = '/reset-password';
   static const String home = '/home';
+  static const String sedeDetalle = '/sede';
   static const String reservar = '/reservar';
   static const String confirmarReserva = '/confirmar-reserva';
   static const String reservaDetalle = '/reserva';
@@ -26,6 +28,10 @@ abstract final class AppRouter {
         ResetPasswordScreen(initialEmail: settings.arguments as String? ?? ''),
       ),
       AppRoutes.home => _ruta(settings, const HomeScreen()),
+      AppRoutes.sedeDetalle => _ruta(
+        settings,
+        SedeDetalleScreen(sede: _argumentos<Sede>(settings)),
+      ),
       AppRoutes.reservar => _ruta<Reserva>(
         settings,
         ReservarScreen.desde(_argumentos<ReservarArgs>(settings)),

@@ -1,119 +1,120 @@
-import 'dart:async';
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import 'package:flutter_app/src/services/api_exception.dart';
 import 'package:flutter_app/src/services/api_service.dart';
-
-/// Aviso de reserva recibido mientras la app está abierta.
-class AvisoReserva {
-  final int reservaId;
-  final String titulo;
-  final String cuerpo;
-
-  const AvisoReserva({
-    required this.reservaId,
-    required this.titulo,
-    required this.cuerpo,
-  });
-}
 
 /// Notificaciones push de reservas próximas (Firebase Cloud Messaging).
 ///
-/// La API envía los avisos 24 h y 1 h antes de cada reserva al token que
-/// registra [activar]. Con la app cerrada o en segundo plano, Android muestra
-/// la notificación solo; con la app abierta llega por [avisosEnPrimerPlano].
+/// Para que el backend pueda mandarle un push a este celular necesita su
+/// "token" de FCM: [activar] lo pide y lo guarda en la API. El backend envía
+/// los avisos 24 h y 1 h antes de cada reserva a todos los tokens del usuario.
+///
+/// Cómo se reciben los avisos según el estado de la app lo resuelve el home
+/// (ver `HomeScreen._escucharNotificaciones`).
 class NotificacionesService {
+  /// Canal de Android de los avisos. Con importancia alta Android los muestra
+  /// como banner arriba de la pantalla; el canal que usa FCM si no hay otro
+  /// ("Miscellaneous") solo deja el ícono en la barra de estado.
+  /// El AndroidManifest lo declara como canal por defecto de FCM, así los
+  /// push que muestra Android con la app en segundo plano también lo usan.
+  static const _canal = AndroidNotificationChannel(
+    'recordatorios_reservas',
+    'Recordatorios de reservas',
+    description: 'Avisos 24 h y 1 h antes de cada reserva',
+    importance: Importance.high,
+  );
+
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  final FlutterLocalNotificationsPlugin _locales =
+      FlutterLocalNotificationsPlugin();
   final ApiService _api = ApiService();
 
-  /// Último token registrado (o registrándose) en la API. Al pedir un token
-  /// nuevo, FCM lo devuelve en [activar] y además lo emite por
-  /// `onTokenRefresh`; con esto se registra una sola vez. Es estático porque
-  /// se crean varias instancias del servicio.
-  static String? _tokenRegistrado;
+  /// Crea el canal de los avisos y prepara las notificaciones que se muestran
+  /// con la app abierta ([mostrar]). Al tocar una se llama a [onTocar] con la
+  /// reserva del aviso.
+  Future<void> inicializar({
+    required void Function(int reservaId) onTocar,
+  }) async {
+    try {
+      await _locales.initialize(
+        settings: const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        ),
+        onDidReceiveNotificationResponse: (respuesta) {
+          final reservaId = int.tryParse(respuesta.payload ?? '');
+          if (reservaId != null) onTocar(reservaId);
+        },
+      );
+      await _locales
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(_canal);
+    } catch (e) {
+      debugPrint('No se pudieron preparar las notificaciones: $e');
+    }
+  }
 
-  /// Pide permiso y registra el dispositivo en la API.
+  /// Pide permiso y registra el token del celular en la API.
   ///
-  /// Si falla Firebase Messaging la app sigue sin notificaciones; si falla el
-  /// registro en el servidor lanza [ApiException] para poder avisarle al
-  /// usuario.
+  /// Se llama en cada inicio y no pasa nada por repetirlo: Android muestra el
+  /// diálogo de permiso solo la primera vez (después devuelve lo que eligió
+  /// el usuario), el token es siempre el mismo y la API no lo duplica.
+  /// Si algo falla la app sigue funcionando, solo que sin push.
   Future<void> activar() async {
-    final String? token;
     try {
       final permiso = await _messaging.requestPermission();
       if (permiso.authorizationStatus == AuthorizationStatus.denied) return;
 
-      token = await _messaging.getToken();
+      final token = await _messaging.getToken();
+      if (token != null) await _api.registrarDispositivo(token);
     } catch (e) {
-      // Sin Google Play Services, sin conexión con FCM, etc.
-      debugPrint('No se pudo obtener el token de FCM: $e');
-      return;
+      debugPrint('No se pudieron activar las notificaciones: $e');
     }
-    if (token != null) await _registrar(token);
   }
 
-  /// Vuelve a registrar el dispositivo cuando FCM renueva el token.
-  StreamSubscription<String> escucharRenovacionDeToken() => _messaging
-      .onTokenRefresh
-      .listen((token) => _registrar(token).catchError((_) {}));
+  /// Muestra un push que llegó con la app abierta: en ese caso Android no lo
+  /// muestra solo (con la app en segundo plano o cerrada, sí).
+  Future<void> mostrar(RemoteMessage mensaje) async {
+    final notificacion = mensaje.notification;
+    if (notificacion == null) return;
+    final reservaId = NotificacionesService.reservaId(mensaje);
+    try {
+      await _locales.show(
+        // Un aviso nuevo de la misma reserva reemplaza al anterior
+        id: reservaId ?? 0,
+        title: notificacion.title,
+        body: notificacion.body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _canal.id,
+            _canal.name,
+            channelDescription: _canal.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            // El cuerpo tiene dos líneas (espacio y sede, fecha y horario)
+            styleInformation: BigTextStyleInformation(notificacion.body ?? ''),
+          ),
+        ),
+        payload: reservaId?.toString(),
+      );
+    } catch (e) {
+      debugPrint('No se pudo mostrar la notificación: $e');
+    }
+  }
 
-  /// Deja de recibir avisos en este dispositivo. Se llama antes de cerrar
-  /// sesión, mientras todavía hay un usuario autenticado.
+  /// Deja de recibir avisos en este celular (al cerrar sesión). Borra el
+  /// token: los envíos a ese token fallan y la API lo elimina de la base.
   Future<void> desactivar() async {
     try {
-      final token = await _messaging.getToken();
-      if (token != null) await _api.quitarDispositivo(token);
       await _messaging.deleteToken();
-    } catch (_) {
-      // Si falla, la API borra el token cuando FCM lo informe como inválido
-    } finally {
-      _tokenRegistrado = null;
+    } catch (e) {
+      debugPrint('No se pudo borrar el token de FCM: $e');
     }
   }
 
-  Future<void> _registrar(String token) async {
-    if (token == _tokenRegistrado) return;
-    // Se marca antes de la request, para que una llamada simultánea no la repita
-    _tokenRegistrado = token;
-    try {
-      await _api.registrarDispositivo(token);
-    } catch (_) {
-      _tokenRegistrado = null;
-      rethrow;
-    }
-  }
-
-  /// Reserva de la notificación que abrió la app estando cerrada, si hubo.
-  Future<int?> reservaQueAbrioLaApp() async {
-    try {
-      final mensaje = await _messaging.getInitialMessage();
-      return mensaje == null ? null : _reservaId(mensaje);
-    } catch (_) {
-      // Sin Firebase Messaging disponible la app sigue sin notificaciones
-      return null;
-    }
-  }
-
-  /// Reservas de las notificaciones que el usuario toca con la app en
-  /// segundo plano.
-  Stream<int> get reservasAbiertas => FirebaseMessaging.onMessageOpenedApp
-      .map(_reservaId)
-      .where((id) => id != null)
-      .cast<int>();
-
-  /// Avisos que llegan con la app abierta (Android no los muestra solo).
-  Stream<AvisoReserva> get avisosEnPrimerPlano => FirebaseMessaging.onMessage
-      .where((m) => _reservaId(m) != null)
-      .map(
-        (m) => AvisoReserva(
-          reservaId: _reservaId(m)!,
-          titulo: m.notification?.title ?? 'Recordatorio de reserva',
-          cuerpo: m.notification?.body ?? '',
-        ),
-      );
-
-  static int? _reservaId(RemoteMessage mensaje) =>
+  /// Reserva a la que se refiere un push (la API la manda en "reserva_id").
+  static int? reservaId(RemoteMessage mensaje) =>
       int.tryParse(mensaje.data['reserva_id']?.toString() ?? '');
 }

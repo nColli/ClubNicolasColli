@@ -1,7 +1,4 @@
-from datetime import datetime, timezone
-
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.dialects.postgresql import insert
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import models
@@ -17,10 +14,10 @@ router = APIRouter(prefix="/dispositivos", tags=["Notificaciones"])
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Registrar un dispositivo para notificaciones",
     description=(
-        "Guarda el token de FCM del dispositivo del usuario autenticado para "
-        "enviarle avisos de sus reservas próximas. Si el token ya estaba "
-        "registrado (por ejemplo, por otro usuario en el mismo celular), pasa a "
-        "ser del usuario autenticado."
+        "Guarda el token de FCM del celular del usuario autenticado para enviarle "
+        "avisos de sus reservas próximas. La app lo llama en cada inicio: si el "
+        "token ya estaba registrado no se duplica, y si era de otro usuario (que "
+        "usó el mismo celular) pasa a ser del usuario autenticado."
     ),
     responses={
         401: {"model": ErrorResponse, "description": "Token ausente, inválido o expirado"},
@@ -36,44 +33,15 @@ def registrar_dispositivo(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no registrado."
         )
-    # Upsert atómico: al iniciar sesión la app puede registrar el mismo token
-    # dos veces a la vez (getToken y onTokenRefresh), y con un SELECT + INSERT
-    # las dos requests intentarían insertarlo
-    valores = {
-        "token": datos.token,
-        "usuario_id": token["uid"],
-        "actualizado": datetime.now(timezone.utc),
-    }
-    db.execute(
-        insert(models.Dispositivo)
-        .values(**valores)
-        .on_conflict_do_update(
-            index_elements=[models.Dispositivo.token],
-            set_={"usuario_id": valores["usuario_id"], "actualizado": valores["actualizado"]},
-        )
+
+    dispositivo = db.get(models.Dispositivo, datos.token)
+    if dispositivo is None:
+        db.add(models.Dispositivo(token=datos.token, usuario_id=token["uid"]))
+    else:
+        dispositivo.usuario_id = token["uid"]
+    db.commit()
+    print(
+        f"[push] Dispositivo {'nuevo' if dispositivo is None else 'ya registrado'} "
+        f"{datos.token[:12]}... del usuario {token['uid']}",
+        flush=True,
     )
-    db.commit()
-
-
-@router.delete(
-    "",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Quitar un dispositivo",
-    description=(
-        "Deja de enviar notificaciones al dispositivo (se usa al cerrar sesión). "
-        "Si el token no está registrado para el usuario autenticado no hace nada."
-    ),
-    responses={
-        401: {"model": ErrorResponse, "description": "Token ausente, inválido o expirado"},
-    },
-)
-def quitar_dispositivo(
-    fcm_token: str = Query(alias="token", description="Token de FCM del dispositivo"),
-    token: dict = Depends(get_firebase_user),
-    db: Session = Depends(get_db),
-) -> None:
-    db.query(models.Dispositivo).filter(
-        models.Dispositivo.token == fcm_token,
-        models.Dispositivo.usuario_id == token["uid"],
-    ).delete()
-    db.commit()

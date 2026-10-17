@@ -1,15 +1,11 @@
-import os
-import secrets
-
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app import models
 from app.database import get_db
 from app.firebase import get_firebase_user
-from app.notificaciones import enviar_avisos_pendientes
-from app.schemas import ErrorResponse, Notificacion, ResultadoAvisos
+from app.schemas import ErrorResponse, Notificacion
 
 router = APIRouter(prefix="/notificaciones", tags=["Notificaciones"])
 
@@ -59,31 +55,3 @@ def marcar_leidas(
         update(n).where(n.usuario_id == token["uid"], n.leida.is_(False)).values(leida=True)
     )
     db.commit()
-
-
-@router.post(
-    "/enviar-pendientes",
-    response_model=ResultadoAvisos,
-    summary="Enviar avisos de reservas próximas",
-    description=(
-        "Envía los avisos push de 24 h y 1 h antes que correspondan en este momento. "
-        "La API ya lo hace sola cada pocos minutos; este endpoint es para un cron "
-        "externo, útil en Render (free), donde el servicio se suspende sin tráfico. "
-        "Requiere el header `X-Cron-Secret` con el valor de la variable `CRON_SECRET`."
-    ),
-    responses={
-        403: {"model": ErrorResponse, "description": "Falta el secreto o no coincide"},
-    },
-)
-def enviar_pendientes(
-    x_cron_secret: str | None = Header(None),
-    db: Session = Depends(get_db),
-) -> ResultadoAvisos:
-    esperado = os.getenv("CRON_SECRET")
-    if not esperado or not x_cron_secret or not secrets.compare_digest(
-        x_cron_secret, esperado
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Secreto inválido."
-        )
-    return ResultadoAvisos(enviados=enviar_avisos_pendientes(db))

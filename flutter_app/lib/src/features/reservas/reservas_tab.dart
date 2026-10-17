@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_app/src/constants/constants.dart';
 import 'package:flutter_app/src/enums/enums.dart';
+import 'package:flutter_app/src/features/reservas/reserva_detalle_screen.dart';
 import 'package:flutter_app/src/features/reservas/widgets/cancelar_reserva_dialog.dart';
 import 'package:flutter_app/src/features/reservas/widgets/reserva_card.dart';
 import 'package:flutter_app/src/models/models.dart';
+import 'package:flutter_app/src/routing/routing.dart';
 import 'package:flutter_app/src/services/services.dart';
 import 'package:flutter_app/src/theme/theme.dart';
 import 'package:flutter_app/src/utils/utils.dart';
@@ -15,21 +17,9 @@ enum _Pestana { proximas, historial }
 /// Pestaña "Mis reservas": próximas e historial. Al tocar una reserva se
 /// abre su detalle.
 class ReservasTab extends StatefulWidget {
-  /// Cuando cambia, se vuelven a cargar las reservas
-  final int versionReservas;
-  final ValueChanged<Reserva> onAbrirReserva;
-
-  /// Se canceló una reserva desde la lista: el home recarga las reservas
-  final VoidCallback onReservaCancelada;
   final VoidCallback onReservar;
 
-  const ReservasTab({
-    super.key,
-    required this.versionReservas,
-    required this.onAbrirReserva,
-    required this.onReservaCancelada,
-    required this.onReservar,
-  });
+  const ReservasTab({super.key, required this.onReservar});
 
   @override
   State<ReservasTab> createState() => _ReservasTabState();
@@ -47,12 +37,6 @@ class _ReservasTabState extends State<ReservasTab> {
   void initState() {
     super.initState();
     _cargar();
-  }
-
-  @override
-  void didUpdateWidget(ReservasTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.versionReservas != widget.versionReservas) _cargar();
   }
 
   Future<void> _cargar() async {
@@ -74,7 +58,16 @@ class _ReservasTabState extends State<ReservasTab> {
 
   Future<void> _cancelar(Reserva reserva) async {
     final cambio = await cancelarReservaConConfirmacion(context, reserva);
-    if (cambio && mounted) widget.onReservaCancelada();
+    if (cambio && mounted) _cargar();
+  }
+
+  /// Abre el detalle de una reserva; si se canceló, recarga la lista.
+  Future<void> _abrirReserva(Reserva reserva) async {
+    final cancelada = await Navigator.of(context).pushNamed<bool>(
+      AppRoutes.reservaDetalle,
+      arguments: ReservaDetalleArgs(reservaId: reserva.id, reserva: reserva),
+    );
+    if (cancelada == true && mounted) _cargar();
   }
 
   @override
@@ -157,7 +150,7 @@ class _ReservasTabState extends State<ReservasTab> {
                   onCancelar: reserva.cancelable(ahora)
                       ? () => _cancelar(reserva)
                       : null,
-                  onTap: () => widget.onAbrirReserva(reserva),
+                  onTap: () => _abrirReserva(reserva),
                 ),
               ),
         ],

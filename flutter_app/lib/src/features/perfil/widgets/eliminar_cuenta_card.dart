@@ -6,7 +6,6 @@ import 'package:flutter_app/src/theme/theme.dart';
 
 const Color _rojo = Color(0xFFDC2626);
 const Color _rojoClaro = Color(0xFFF87171);
-const Color _fondoOscuro = Color(0xFF16090A);
 
 /// Tarjeta "Zona de peligro" con el botón para dar de baja la cuenta.
 class EliminarCuentaCard extends StatelessWidget {
@@ -19,7 +18,7 @@ class EliminarCuentaCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
-        color: _fondoOscuro,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: _rojo.withValues(alpha: 0.35)),
       ),
@@ -51,7 +50,6 @@ class EliminarCuentaDialog extends StatefulWidget {
 
 class _EliminarCuentaDialogState extends State<EliminarCuentaDialog> {
   final ApiService _api = ApiService();
-  final NotificacionesService _notificaciones = NotificacionesService();
 
   bool _eliminando = false;
   String? _error;
@@ -61,14 +59,12 @@ class _EliminarCuentaDialogState extends State<EliminarCuentaDialog> {
       _eliminando = true;
       _error = null;
     });
-    // Antes de eliminar, porque quitar el dispositivo requiere el token
-    await _notificaciones.desactivar();
     try {
+      // La API borra también los dispositivos del usuario
       await _api.eliminarCuenta();
+      await NotificacionesService().desactivar();
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      // La cuenta sigue existiendo: se vuelven a activar las notificaciones
-      _notificaciones.activar().catchError((_) {});
       if (!mounted) return;
       setState(() {
         _eliminando = false;
@@ -82,7 +78,7 @@ class _EliminarCuentaDialogState extends State<EliminarCuentaDialog> {
     return PopScope(
       canPop: !_eliminando,
       child: Dialog(
-        backgroundColor: _fondoOscuro,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           side: BorderSide(color: _rojo.withValues(alpha: 0.35)),

@@ -7,35 +7,19 @@ import 'package:flutter_app/src/features/home/widgets/lista_sedes.dart';
 import 'package:flutter_app/src/features/home/widgets/proxima_reserva_card.dart';
 import 'package:flutter_app/src/features/home/widgets/seccion_header.dart';
 import 'package:flutter_app/src/features/notificaciones/notificaciones.dart';
+import 'package:flutter_app/src/features/reservas/reservas.dart';
 import 'package:flutter_app/src/models/models.dart';
+import 'package:flutter_app/src/routing/routing.dart';
 import 'package:flutter_app/src/services/services.dart';
 import 'package:flutter_app/src/theme/theme.dart';
 import 'package:flutter_app/src/widgets/widgets.dart';
 
+/// Pestaña de inicio: saludo, campana, próxima reserva y sedes. Carga todo
+/// cada vez que se entra a la pestaña.
 class InicioTab extends StatefulWidget {
-  /// Cuando cambia, el inicio vuelve a cargar la próxima reserva
-  final int versionReservas;
-
-  /// Cuando cambia, el inicio vuelve a cargar el perfil (nombre del saludo)
-  final int versionPerfil;
-
-  /// Cuando cambia, se vuelve a revisar si hay notificaciones nuevas
-  final int versionNotificaciones;
   final ValueChanged<HomeTab> onIrATab;
-  final ValueChanged<Sede> onAbrirSede;
 
-  /// Abre el detalle de una reserva (la próxima reserva o una notificación)
-  final void Function(int reservaId, [Reserva? reserva]) onAbrirReserva;
-
-  const InicioTab({
-    super.key,
-    required this.versionReservas,
-    required this.versionPerfil,
-    required this.versionNotificaciones,
-    required this.onIrATab,
-    required this.onAbrirSede,
-    required this.onAbrirReserva,
-  });
+  const InicioTab({super.key, required this.onIrATab});
 
   @override
   State<InicioTab> createState() => _InicioTabState();
@@ -58,20 +42,6 @@ class _InicioTabState extends State<InicioTab> {
   void initState() {
     super.initState();
     _cargar();
-  }
-
-  @override
-  void didUpdateWidget(InicioTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // _cargar ya incluye el perfil y las notificaciones
-    if (oldWidget.versionReservas != widget.versionReservas) {
-      _cargar();
-      return;
-    }
-    if (oldWidget.versionPerfil != widget.versionPerfil) _cargarPerfil();
-    if (oldWidget.versionNotificaciones != widget.versionNotificaciones) {
-      _cargarNotificaciones();
-    }
   }
 
   Future<void> _cargar() async {
@@ -126,11 +96,23 @@ class _InicioTabState extends State<InicioTab> {
     }
   }
 
-  Future<void> _abrirNotificaciones() async {
+  void _abrirNotificaciones() {
     // El panel las marca como leídas al abrirse
     setState(() => _hayNotificacionesNuevas = false);
-    await mostrarNotificaciones(context, onAbrirReserva: widget.onAbrirReserva);
-    if (mounted) _cargarNotificaciones();
+    mostrarNotificaciones(context, onAbrirReserva: _abrirReserva);
+  }
+
+  void _abrirSede(Sede sede) {
+    Navigator.of(context).pushNamed(AppRoutes.sedeDetalle, arguments: sede);
+  }
+
+  /// Abre el detalle de una reserva; si se canceló, recarga el inicio.
+  Future<void> _abrirReserva(int reservaId, [Reserva? reserva]) async {
+    final cancelada = await Navigator.of(context).pushNamed<bool>(
+      AppRoutes.reservaDetalle,
+      arguments: ReservaDetalleArgs(reservaId: reservaId, reserva: reserva),
+    );
+    if (cancelada == true && mounted) _cargar();
   }
 
   List<String> get _deportes =>
@@ -154,6 +136,7 @@ class _InicioTabState extends State<InicioTab> {
             hayNotificacionesNuevas: _hayNotificacionesNuevas,
             onNotificacionesTap: _abrirNotificaciones,
           ),
+          const SizedBox(height: 16),
           if (_cargando)
             const Padding(
               padding: EdgeInsets.only(top: 48),
@@ -169,7 +152,7 @@ class _InicioTabState extends State<InicioTab> {
               child: ProximaReservaCard(
                 reserva: _proximaReserva,
                 onVerReservas: () => widget.onIrATab(HomeTab.reservas),
-                onTap: (r) => widget.onAbrirReserva(r.id, r),
+                onTap: (r) => _abrirReserva(r.id, r),
                 onReservar: () => widget.onIrATab(HomeTab.sedes),
               ),
             ),
@@ -188,7 +171,7 @@ class _InicioTabState extends State<InicioTab> {
             ListaSedes(
               sedes: _sedesFiltradas,
               deporteSeleccionado: _deporteSeleccionado,
-              onAbrirSede: widget.onAbrirSede,
+              onAbrirSede: _abrirSede,
             ),
           ],
         ],

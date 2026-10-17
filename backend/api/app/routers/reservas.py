@@ -131,7 +131,7 @@ def crear_reserva(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_HORARIO_OCUPADO)
 
     reserva = models.Reserva(
-        espacio_id=espacio.id,
+        espacio=espacio,
         usuario_id=token["uid"],
         fecha=datos.fecha,
         hora_inicio=datos.hora_inicio,
@@ -147,7 +147,7 @@ def crear_reserva(
             reserva.usuario_id,
             reserva.id,
             "Reserva confirmada",
-            _describir(reserva, espacio),
+            notificaciones.describir_reserva(reserva),
         )
         db.commit()
     except IntegrityError as e:
@@ -232,17 +232,8 @@ def cancelar_reserva(
         reserva.usuario_id,
         None,  # la reserva se elimina
         "Reserva cancelada",
-        _describir(reserva, reserva.espacio),
+        notificaciones.describir_reserva(reserva),
     )
     db.delete(reserva)
     db.commit()
 
-
-def _describir(reserva: models.Reserva, espacio: models.EspacioDeportivo) -> str:
-    return notificaciones.describir_reserva(
-        f"{espacio.tipo} {espacio.numero}",
-        espacio.sede.nombre,
-        reserva.fecha,
-        reserva.hora_inicio,
-        reserva.hora_fin,
-    )
