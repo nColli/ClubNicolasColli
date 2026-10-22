@@ -131,7 +131,7 @@ def _avisar(db: Session, reserva: models.Reserva, titulo: str) -> None:
         for token in tokens
     ]
     try:
-        respuesta = messaging.send_each(mensajes)
+        respuesta = messaging.send_each(mensajes) #messaging es el servicio de firebase para enviar notif a disp que tiene el token guardado
     except exceptions.FirebaseError:
         log.exception("No se pudo enviar el aviso de la reserva %s", reserva.id)
         return

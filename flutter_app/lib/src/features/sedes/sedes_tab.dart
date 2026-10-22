@@ -40,7 +40,7 @@ class _SedesTabState extends State<SedesTab> {
     });
     try {
       final sedes = await _api.obtenerSedes();
-      if (mounted) setState(() => _sedes = sedes);
+      if (mounted) setState(() => _sedes = sedes); //uso mounted xq si se destruye la vista - ej usuario salio de la vista no actualizo el estado
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.mensaje);
     } catch (_) {
@@ -106,7 +106,7 @@ class _SedesTabState extends State<SedesTab> {
                 child: SedeCard(
                   sede: sede,
                   expandida: true,
-                  onTap: () => _abrirSede(sede),
+                  onTap: () => _abrirSede(sede), //si selecciono una sede, abre el detalle
                 ),
               ),
           ],

@@ -28,7 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final List<StreamSubscription<RemoteMessage>> _suscripciones = [];
 
-  HomeTab _tabActual = HomeTab.inicio;
+  HomeTab _tabActual = HomeTab.inicio; //para que siempre al inicio vaya a tab inicio, dsp cambia cuando toco - onTap
 
   @override
   void initState() {
@@ -86,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       extendBody: true,
-      body: switch (_tabActual) {
+      body: switch (_tabActual) { //siempre renderizo el bottomNavigationBar y cambio el cuerpo de acuerdo a lo que quiero ver
         HomeTab.inicio => InicioTab(onIrATab: _irATab),
         HomeTab.sedes => const SedesTab(),
         HomeTab.reservas => ReservasTab(

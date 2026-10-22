@@ -38,7 +38,7 @@ class ReservarScreen extends StatefulWidget {
 }
 
 class _ReservarScreenState extends State<ReservarScreen> {
-  static const _diasAMostrar = 14;
+  static const _diasAMostrar = 14; //hardcodeado puedo reservar hasta en 14 dias
   static const _duraciones = [1, 2];
 
   final ApiService _api = ApiService();
