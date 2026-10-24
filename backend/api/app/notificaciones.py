@@ -1,11 +1,11 @@
 """Notificaciones de reservas.
 
-Hay dos tipos:
-- La campana de la app: filas de la tabla NOTIFICACION (`registrar`). Se crean
-  al confirmar o cancelar una reserva y con cada aviso.
 - Los avisos push 24 h y 1 h antes de cada reserva (`enviar_avisos_pendientes`),
   que se mandan por Firebase Cloud Messaging a los celulares del usuario. Los
   revisa una tarea de la API, cada 5 minutos por defecto (ver main.py).
+- La campana de la app (GET /notificaciones) no se guarda en la base: muestra
+  las reservas que todavía no empezaron y ya tienen un aviso enviado, con el
+  título y el cuerpo armados en el momento (`titulo_aviso`, `describir_reserva`).
 """
 
 import logging
@@ -23,18 +23,6 @@ _DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 _MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 
-def registrar(
-    db: Session, usuario_id: str, reserva_id: int | None, titulo: str, cuerpo: str
-) -> None:
-    """Guarda una notificación para la campana de la app. No hace commit: se
-    confirma junto con el cambio que la origina."""
-    db.add(
-        models.Notificacion(
-            usuario_id=usuario_id, reserva_id=reserva_id, titulo=titulo, cuerpo=cuerpo
-        )
-    )
-
-
 def describir_reserva(reserva: models.Reserva) -> str:
     """ "Fútbol 1 · Sede Ramos Mejía\nmié, 15 oct · 18:00 – 20:00 hs" """
     espacio, fecha = reserva.espacio, reserva.fecha
@@ -43,6 +31,23 @@ def describir_reserva(reserva: models.Reserva) -> str:
         f"{_DIAS[fecha.weekday()]}, {fecha.day} {_MESES[fecha.month - 1]} · "
         f"{reserva.hora_inicio:02d}:00 – {reserva.hora_fin:02d}:00 hs"
     )
+
+
+def inicio(reserva: models.Reserva) -> datetime:
+    return datetime.combine(reserva.fecha, time(reserva.hora_inicio), horarios.ZONA_HORARIA)
+
+
+def titulo_aviso(reserva: models.Reserva, ahora: datetime) -> str:
+    """ "Tu reserva es hoy", "Tu reserva es mañana" o, si falta 1 hora o menos,
+    "Tu reserva empieza en 40 minutos". """
+    falta = inicio(reserva) - ahora
+    if falta <= timedelta(hours=1):
+        minutos = round(falta.total_seconds() / 60)
+        if minutos >= 55:
+            return "Tu reserva empieza en 1 hora"
+        return f"Tu reserva empieza en {max(minutos, 1)} minutos"
+    # Con menos de 24 h de anticipación la reserva puede ser hoy mismo
+    return "Tu reserva es hoy" if reserva.fecha == ahora.date() else "Tu reserva es mañana"
 
 
 def enviar_avisos_pendientes(db: Session) -> None:
@@ -67,29 +72,14 @@ def enviar_avisos_pendientes(db: Session) -> None:
     )
 
     for reserva in reservas:
-        inicio = datetime.combine(
-            reserva.fecha, time(reserva.hora_inicio), horarios.ZONA_HORARIA
-        )
-        falta = inicio - ahora
+        falta = inicio(reserva) - ahora
         if not reserva.aviso_24h_enviado and timedelta(hours=1) < falta <= timedelta(hours=24):
             reserva.aviso_24h_enviado = True
-            # Con menos de 24 h de anticipación la reserva puede ser hoy mismo
-            _avisar(
-                db,
-                reserva,
-                "Tu reserva es hoy" if reserva.fecha == ahora.date() else "Tu reserva es mañana",
-            )
+            _avisar(db, reserva, titulo_aviso(reserva, ahora))
         elif not reserva.aviso_1h_enviado and timedelta(0) < falta <= timedelta(hours=1):
             # El de 24 h ya no corresponde: se marca para no volver a revisarlo
             reserva.aviso_24h_enviado = reserva.aviso_1h_enviado = True
-            minutos = round(falta.total_seconds() / 60)
-            _avisar(
-                db,
-                reserva,
-                "Tu reserva empieza en 1 hora"
-                if minutos >= 55
-                else f"Tu reserva empieza en {max(minutos, 1)} minutos",
-            )
+            _avisar(db, reserva, titulo_aviso(reserva, ahora))
         elif falta <= timedelta(0):
             # Ya empezó (por ejemplo, si la API estuvo apagada): los avisos que
             # faltaban ya no corresponden
@@ -99,11 +89,10 @@ def enviar_avisos_pendientes(db: Session) -> None:
 
 
 def _avisar(db: Session, reserva: models.Reserva, titulo: str) -> None:
-    """Guarda el aviso en la campana y lo manda por push a los celulares del usuario."""
+    """Manda el aviso por push a los celulares del usuario."""
     cuerpo = describir_reserva(reserva)
-    registrar(db, reserva.usuario_id, reserva.id, titulo, cuerpo)
     # Se confirma antes de enviar: así el aviso queda marcado como enviado
-    # (y en la campana) aunque falle el push, y no se repite
+    # (y aparece en la campana) aunque falle el push, y no se repite
     db.commit()
 
     tokens = db.scalars(
@@ -117,7 +106,7 @@ def _avisar(db: Session, reserva: models.Reserva, titulo: str) -> None:
         flush=True,
     )
     if not tokens:
-        print("[push] El usuario no tiene dispositivos: el aviso queda solo en la campana", flush=True)
+        print("[push] El usuario no tiene dispositivos: el aviso se ve solo en la campana", flush=True)
         return
 
     mensajes = [

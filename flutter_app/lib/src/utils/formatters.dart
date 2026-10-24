@@ -122,18 +122,6 @@ abstract final class Formatters {
     return 'en $dias días';
   }
 
-  /// Tiempo transcurrido desde [momento]: "recién", "hace 5 min",
-  /// "hace 2 h", "ayer", "hace 3 días" o la fecha ("sáb, 15 ago").
-  static String haceCuanto(DateTime momento, [DateTime? ahora]) {
-    final pasado = (ahora ?? DateTime.now()).difference(momento);
-    if (pasado.inMinutes < 1) return 'recién';
-    if (pasado.inMinutes < 60) return 'hace ${pasado.inMinutes} min';
-    if (pasado.inHours < 24) return 'hace ${pasado.inHours} h';
-    if (pasado.inDays == 1) return 'ayer';
-    if (pasado.inDays < 7) return 'hace ${pasado.inDays} días';
-    return fechaCorta(Reloj.ahora(momento));
-  }
-
   /// Saludo según la hora del día.
   static String saludo([DateTime? ahora]) {
     final hora = (ahora ?? Reloj.ahora()).hour;

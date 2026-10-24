@@ -128,8 +128,8 @@ def actualizar_perfil(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Dar de baja la cuenta del usuario autenticado",
     description=(
-        "Elimina al usuario de la base (junto con sus reservas, dispositivos y "
-        "notificaciones) y su cuenta de Firebase. No se puede deshacer."
+        "Elimina al usuario de la base (junto con sus reservas y dispositivos) "
+        "y su cuenta de Firebase. No se puede deshacer."
     ),
     responses={
         401: {"model": ErrorResponse, "description": "Token ausente, inválido o expirado"},
@@ -142,7 +142,7 @@ def eliminar_cuenta(
     db: Session = Depends(get_db),
 ) -> None:
     usuario = _usuario_registrado(db, token["uid"])
-    # RESERVA no tiene ON DELETE CASCADE; dispositivos y notificaciones sí
+    # RESERVA no tiene ON DELETE CASCADE; DISPOSITIVO sí
     db.query(models.Reserva).filter(models.Reserva.usuario_id == usuario.uid).delete()
     db.delete(usuario)
     db.flush()

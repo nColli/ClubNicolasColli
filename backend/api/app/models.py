@@ -2,19 +2,17 @@
 de verdad del schema es database/schema.sql. Si se cambia una tabla ahí, hay que
 actualizar el modelo correspondiente."""
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     Date,
-    DateTime,
     ForeignKey,
     Numeric,
     SmallInteger,
     String,
     UniqueConstraint,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -97,23 +95,3 @@ class Dispositivo(Base):
         ForeignKey("usuario.uid", ondelete="CASCADE")
     )
 
-
-class Notificacion(Base):
-    """Notificación que el usuario ve en la app (campana del inicio)."""
-
-    __tablename__ = "notificacion"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    usuario_id: Mapped[str] = mapped_column(
-        ForeignKey("usuario.uid", ondelete="CASCADE")
-    )
-    # NULL si la reserva se canceló
-    reserva_id: Mapped[int | None] = mapped_column(
-        ForeignKey("reserva.id", ondelete="SET NULL")
-    )
-    titulo: Mapped[str] = mapped_column(String(200))
-    cuerpo: Mapped[str] = mapped_column(String(500))
-    creada: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    leida: Mapped[bool] = mapped_column(Boolean, default=False)

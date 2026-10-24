@@ -82,14 +82,10 @@ class ApiService {
     await _delete('/reservas/$reservaId');
   }
 
-  /// Notificaciones de la campana, de la más nueva a la más vieja.
+  /// Recordatorios de la campana, de la reserva más cercana a la más lejana.
   Future<List<Notificacion>> obtenerNotificaciones() async {
     final json = await _get('/notificaciones') as List;
     return json.map((n) => Notificacion.fromJson(n)).toList();
-  }
-
-  Future<void> marcarNotificacionesLeidas() async {
-    await _post('/notificaciones/leidas', {});
   }
 
   /// Registra el token de FCM del dispositivo para recibir avisos de reservas.

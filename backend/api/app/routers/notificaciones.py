@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy import select, update
+from fastapi import APIRouter, Depends
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from app import models
+from app import horarios, models, notificaciones
 from app.database import get_db
 from app.firebase import get_firebase_user
 from app.schemas import ErrorResponse, Notificacion
@@ -15,43 +15,39 @@ router = APIRouter(prefix="/notificaciones", tags=["Notificaciones"])
     response_model=list[Notificacion],
     summary="Notificaciones del usuario",
     description=(
-        "Devuelve las notificaciones del usuario autenticado (reservas confirmadas "
-        "y canceladas, y recordatorios), de la más nueva a la más vieja."
+        "Devuelve los recordatorios de las reservas del usuario autenticado que "
+        "todavía no empezaron y ya tienen un aviso enviado (24 h o 1 h antes), "
+        "de la más cercana a la más lejana. No se guardan: el título y el cuerpo "
+        "se arman en el momento."
     ),
     responses={
         401: {"model": ErrorResponse, "description": "Token ausente, inválido o expirado"},
     },
 )
 def listar_notificaciones(
-    limit: int = Query(30, ge=1, le=100, description="Cantidad máxima"),
     token: dict = Depends(get_firebase_user),
     db: Session = Depends(get_db),
 ) -> list[Notificacion]:
-    n = models.Notificacion
-    notificaciones = db.scalars(
-        select(n)
-        .where(n.usuario_id == token["uid"])
-        .order_by(n.creada.desc(), n.id.desc())
-        .limit(limit)
+    ahora = horarios.ahora()
+    r = models.Reserva
+    reservas = db.scalars(
+        select(r)
+        .where(
+            r.usuario_id == token["uid"],
+            or_(r.aviso_24h_enviado.is_(True), r.aviso_1h_enviado.is_(True)),
+            # Igual que horarios.es_futura: que todavía no haya empezado
+            or_(
+                r.fecha > ahora.date(),
+                and_(r.fecha == ahora.date(), r.hora_inicio > ahora.hour),
+            ),
+        )
+        .order_by(r.fecha, r.hora_inicio)
     ).all()
-    return [Notificacion.model_validate(x) for x in notificaciones]
-
-
-@router.post(
-    "/leidas",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Marcar todas como leídas",
-    description="Marca como leídas todas las notificaciones del usuario autenticado.",
-    responses={
-        401: {"model": ErrorResponse, "description": "Token ausente, inválido o expirado"},
-    },
-)
-def marcar_leidas(
-    token: dict = Depends(get_firebase_user),
-    db: Session = Depends(get_db),
-) -> None:
-    n = models.Notificacion
-    db.execute(
-        update(n).where(n.usuario_id == token["uid"], n.leida.is_(False)).values(leida=True)
-    )
-    db.commit()
+    return [
+        Notificacion(
+            reserva_id=reserva.id,
+            titulo=notificaciones.titulo_aviso(reserva, ahora),
+            cuerpo=notificaciones.describir_reserva(reserva),
+        )
+        for reserva in reservas
+    ]

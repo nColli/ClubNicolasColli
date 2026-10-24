@@ -4,7 +4,7 @@ from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import horarios, models, notificaciones
+from app import horarios, models
 from app.database import get_db
 from app.firebase import get_firebase_user
 from app.schemas import ErrorResponse, Reserva, ReservaCreate
@@ -139,16 +139,7 @@ def crear_reserva(
     )
     db.add(reserva)
     try:
-        # flush para tener el id de la reserva en la notificación; la
-        # superposición se detecta acá
-        db.flush()
-        notificaciones.registrar(
-            db,
-            reserva.usuario_id,
-            reserva.id,
-            "Reserva confirmada",
-            notificaciones.describir_reserva(reserva),
-        )
+        # La superposición se detecta acá
         db.commit()
     except IntegrityError as e:
         db.rollback()
@@ -227,13 +218,6 @@ def cancelar_reserva(
             detail="La reserva ya empezó o terminó, no se puede cancelar.",
         )
 
-    notificaciones.registrar(
-        db,
-        reserva.usuario_id,
-        None,  # la reserva se elimina
-        "Reserva cancelada",
-        notificaciones.describir_reserva(reserva),
-    )
     db.delete(reserva)
     db.commit()
 

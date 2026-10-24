@@ -78,7 +78,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   const BackLink(),
                   const SizedBox(height: 20),
 
-                  const Text('RECUPERAR ACCESO', style: AppTextStyles.eyebrow),
+                  const Text('RESETEAR CONTRASEÑA', style: AppTextStyles.eyebrow),
                   const SizedBox(height: 6),
 
                   const TwoToneTitle(primero: 'NUEVA ', segundo: 'CONTRASEÑA'),
@@ -116,7 +116,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     // Botón volver al login
                     ElevatedButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('VOLVER AL LOGIN'),
+                      child: const Text('VOLVER'),
                     ),
                     const SizedBox(height: 16),
 

@@ -54,6 +54,7 @@ abstract final class AppRouter {
   /// Las rutas que devuelven un resultado se crean con su tipo [T], para que
   /// `pushNamed<T>` pueda recibirlo (un `MaterialPageRoute<dynamic>` no es un
   /// `Route<T?>` y falla el cast).
+  /// CREO EL METODO _RUTA PARA QUE SE ACORTE EL CODIGO PARA CADA APPROUTES.ALGO
   static MaterialPageRoute<T> _ruta<T>(RouteSettings settings, Widget page) =>
       MaterialPageRoute<T>(builder: (_) => page, settings: settings);
 

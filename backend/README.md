@@ -143,7 +143,7 @@ Sin activar el entorno, desde `backend/database`: `../api/.venv/bin/python run_s
 
 Cada ejecución correcta imprime, por ejemplo, `schema.sql ejecutado correctamente.`
 
-- **`schema.sql`** habilita la extensión `btree_gist` (la usa la constraint que impide reservas superpuestas) y crea las tablas `USUARIO`, `SEDE`, `HORARIO_SEDE`, `ESPACIO_DEPORTIVO`, `RESERVA`, `DISPOSITIVO` y `NOTIFICACION`.
+- **`schema.sql`** habilita la extensión `btree_gist` (la usa la constraint que impide reservas superpuestas) y crea las tablas `USUARIO`, `SEDE`, `HORARIO_SEDE`, `ESPACIO_DEPORTIVO`, `RESERVA` y `DISPOSITIVO`.
   ⚠️ Antes de crearlas **borra las tablas existentes y todos sus datos**. Ejecutarlo solo para crear la base o empezar de cero.
 - **`seed.sql`** carga 3 sedes (Morón, Ramos Mejía y Castelar), sus horarios (lunes a viernes de 8 a 23, sábados y domingos de 9 a 20) y 7 espacios deportivos. Se ejecuta **una sola vez** después de `schema.sql`; si se repite, falla por ids duplicados. Para recargarlo, volver a ejecutar primero `schema.sql`.
 - **`migracion_*.sql`** solo sirven para actualizar una base creada con una versión anterior del schema. Una base nueva **no** las necesita.

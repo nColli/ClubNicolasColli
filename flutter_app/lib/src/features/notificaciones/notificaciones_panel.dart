@@ -4,10 +4,9 @@ import 'package:flutter_app/src/constants/constants.dart';
 import 'package:flutter_app/src/models/models.dart';
 import 'package:flutter_app/src/services/services.dart';
 import 'package:flutter_app/src/theme/theme.dart';
-import 'package:flutter_app/src/utils/utils.dart';
 
 /// Abre el panel de notificaciones arriba de la pantalla. Al tocar una
-/// notificación de una reserva vigente se cierra y llama a [onAbrirReserva].
+/// notificación se cierra y llama a [onAbrirReserva].
 Future<void> mostrarNotificaciones(
   BuildContext context, {
   required ValueChanged<int> onAbrirReserva,
@@ -43,8 +42,7 @@ Future<void> mostrarNotificaciones(
   );
 }
 
-/// Lista de notificaciones del usuario. Al abrirse las marca como leídas,
-/// pero mientras está abierto sigue resaltando las que eran nuevas.
+/// Lista de recordatorios de las reservas próximas del usuario.
 class NotificacionesPanel extends StatefulWidget {
   final ValueChanged<int> onAbrirReserva;
 
@@ -76,9 +74,6 @@ class _NotificacionesPanelState extends State<NotificacionesPanel> {
       final notificaciones = await _api.obtenerNotificaciones();
       if (!mounted) return;
       setState(() => _notificaciones = notificaciones);
-      if (notificaciones.any((n) => !n.leida)) {
-        _api.marcarNotificacionesLeidas().catchError((_) {});
-      }
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.mensaje);
     } catch (_) {
@@ -156,7 +151,7 @@ class _NotificacionesPanelState extends State<NotificacionesPanel> {
       return _Mensaje(texto: error, onReintentar: _cargar);
     }
     if (_notificaciones.isEmpty) {
-      return const _Mensaje(texto: 'No tenés notificaciones.');
+      return const _Mensaje(texto: 'No tenés recordatorios de reservas.');
     }
     return ListView.separated(
       shrinkWrap: true,
@@ -165,12 +160,9 @@ class _NotificacionesPanelState extends State<NotificacionesPanel> {
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final notificacion = _notificaciones[i];
-        final reservaId = notificacion.reservaId;
         return _NotificacionTile(
           notificacion: notificacion,
-          onTap: reservaId == null
-              ? null
-              : () => widget.onAbrirReserva(reservaId),
+          onTap: () => widget.onAbrirReserva(notificacion.reservaId),
         );
       },
     );
@@ -179,13 +171,12 @@ class _NotificacionesPanelState extends State<NotificacionesPanel> {
 
 class _NotificacionTile extends StatelessWidget {
   final Notificacion notificacion;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   const _NotificacionTile({required this.notificacion, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final nueva = !notificacion.leida;
     return Material(
       color: AppColors.lightBackground,
       borderRadius: BorderRadius.circular(AppRadius.md),
@@ -203,11 +194,9 @@ class _NotificacionTile extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 6),
                 decoration: BoxDecoration(
                   // Neón con borde oliva para que se vea sobre fondo claro
-                  color: nueva ? AppColors.neonYellow : AppColors.lightBorder,
+                  color: AppColors.neonYellow,
                   shape: BoxShape.circle,
-                  border: nueva
-                      ? Border.all(color: AppColors.olive, width: 1)
-                      : null,
+                  border: Border.all(color: AppColors.olive, width: 1),
                 ),
               ),
               const SizedBox(width: 12),
@@ -217,10 +206,10 @@ class _NotificacionTile extends StatelessWidget {
                   children: [
                     Text(
                       notificacion.titulo,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppColors.lightTextPrimary,
                         fontSize: 15,
-                        fontWeight: nueva ? FontWeight.w800 : FontWeight.w600,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -232,26 +221,17 @@ class _NotificacionTile extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      Formatters.haceCuanto(notificacion.creada),
-                      style: const TextStyle(
-                        color: AppColors.lightTextSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
                   ],
                 ),
               ),
-              if (onTap != null)
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, top: 2),
-                  child: Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: AppColors.lightTextSecondary,
-                  ),
+              const Padding(
+                padding: EdgeInsets.only(left: 4, top: 2),
+                child: Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppColors.lightTextSecondary,
                 ),
+              ),
             ],
           ),
         ),

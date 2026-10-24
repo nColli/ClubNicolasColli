@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
@@ -137,16 +137,9 @@ class Reserva(BaseModel):
 
 
 class Notificacion(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    reserva_id: int | None = Field(
-        description="Reserva a la que se refiere; null si se canceló"
-    )
+    reserva_id: int
     titulo: str
     cuerpo: str
-    creada: datetime
-    leida: bool
 
 
 class DispositivoCreate(BaseModel):

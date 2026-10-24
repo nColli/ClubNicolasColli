@@ -14,7 +14,7 @@ La API envía por Firebase Cloud Messaging un aviso **24 horas** y otro **1 hora
 
 - Una tarea dentro de la API revisa cada 5 minutos (configurable con `AVISOS_INTERVALO_SEGUNDOS` en el `.env`) qué reservas entraron en la ventana de un aviso. El de 24 h se envía en cuanto faltan 24 h o menos para el inicio, así que una reserva hecha con menos anticipación (o una que la API no llegó a revisar por estar suspendida) lo recibe en la siguiente revisión, con el título "Tu reserva es hoy" o "Tu reserva es mañana" según el día. Si ya falta 1 h o menos, solo se envía el de 1 h, que se envía en la última hora.
 - Cada aviso se marca como enviado en `RESERVA` (`aviso_24h_enviado`, `aviso_1h_enviado`) antes de mandar el push, así no se repite.
-- Además del push, cada aviso queda guardado en `NOTIFICACION` junto con las reservas confirmadas y canceladas; la app las muestra en la campana del inicio (`GET /notificaciones`).
+- La campana del inicio (`GET /notificaciones`) no se guarda en la base: muestra las reservas que todavía no empezaron y ya tienen un aviso enviado, con el título y el cuerpo armados en el momento.
 - La app registra el token de FCM con `POST /dispositivos` cada vez que se abre con sesión iniciada. Al cerrar sesión borra el token en el celular; los tokens que FCM informa como inválidos se borran de la base en el siguiente envío.
 
 ## Autenticación
@@ -75,7 +75,7 @@ Actualiza nombre, apellido, DNI y fecha de nacimiento del usuario autenticado. E
 
 ### `DELETE /usuarios/me` — Dar de baja la cuenta
 
-Elimina al usuario de la base junto con sus reservas (pasadas y futuras, así los horarios quedan libres), sus dispositivos y sus notificaciones, y borra su cuenta de Firebase. No se puede deshacer.
+Elimina al usuario de la base junto con sus reservas (pasadas y futuras, así los horarios quedan libres) y sus dispositivos, y borra su cuenta de Firebase. No se puede deshacer.
 
 | Código | Significado |
 |---|---|
@@ -204,21 +204,14 @@ Guarda el token de FCM del celular del usuario autenticado. La app lo llama en c
 
 ### `GET /notificaciones` — Notificaciones del usuario
 
-Devuelve las notificaciones del usuario autenticado (reservas confirmadas y canceladas, y recordatorios de 24 h y 1 h), de la más nueva a la más vieja. Query param opcional `limit` (1 a 100, por defecto 30). `reserva_id` es `null` si la reserva se canceló.
+Devuelve los recordatorios de las reservas del usuario autenticado que todavía no empezaron y ya tienen un aviso enviado (24 h o 1 h antes), de la más cercana a la más lejana. No se guardan en la base: el título se calcula en el momento ("Tu reserva es mañana", "Tu reserva es hoy" o "Tu reserva empieza en 40 minutos").
 
 ```json
 [
   {
-    "id": 12,
     "reserva_id": 7,
-    "titulo": "Reserva confirmada",
-    "cuerpo": "Fútbol 1 · Sede Ramos Mejía\nlun, 12 oct · 10:00 – 12:00 hs",
-    "creada": "2026-10-11T22:07:09Z",
-    "leida": false
+    "titulo": "Tu reserva es mañana",
+    "cuerpo": "Fútbol 1 · Sede Ramos Mejía\nlun, 12 oct · 10:00 – 12:00 hs"
   }
 ]
 ```
-
-### `POST /notificaciones/leidas` — Marcar todas como leídas
-
-Marca como leídas todas las notificaciones del usuario autenticado. Responde 204.

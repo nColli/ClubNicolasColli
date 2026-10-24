@@ -88,7 +88,7 @@ class _InicioTabState extends State<InicioTab> {
       final notificaciones = await _api.obtenerNotificaciones();
       if (mounted) {
         setState(
-          () => _hayNotificacionesNuevas = notificaciones.any((n) => !n.leida),
+          () => _hayNotificacionesNuevas = notificaciones.isNotEmpty,
         );
       }
     } catch (_) {
@@ -97,7 +97,7 @@ class _InicioTabState extends State<InicioTab> {
   }
 
   void _abrirNotificaciones() {
-    // El panel las marca como leídas al abrirse
+    // El punto se apaga al abrir el panel; vuelve si hay recordatorios al recargar
     setState(() => _hayNotificacionesNuevas = false);
     mostrarNotificaciones(context, onAbrirReserva: _abrirReserva);
   }

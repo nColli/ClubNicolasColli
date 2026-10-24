@@ -2,7 +2,6 @@
 --   python run_schema.py
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
-DROP TABLE IF EXISTS NOTIFICACION;
 DROP TABLE IF EXISTS DISPOSITIVO;
 DROP TABLE IF EXISTS RESERVA;
 DROP TABLE IF EXISTS ESPACIO_DEPORTIVO;
@@ -52,7 +51,8 @@ CREATE TABLE IF NOT EXISTS RESERVA (
   fecha        DATE NOT NULL,
   hora_inicio  SMALLINT NOT NULL,
   hora_fin     SMALLINT NOT NULL,
-  -- Marcan si ya se envió el aviso push de 24 h y de 1 h antes del inicio
+  -- Marcan si ya se envió el aviso push de 24 h y de 1 h antes del inicio.
+  -- La campana de la app muestra las reservas futuras con algún aviso enviado.
   aviso_24h_enviado BOOLEAN NOT NULL DEFAULT FALSE,
   aviso_1h_enviado  BOOLEAN NOT NULL DEFAULT FALSE,
   CONSTRAINT reserva_sin_superposicion EXCLUDE USING gist (
@@ -68,19 +68,3 @@ CREATE TABLE IF NOT EXISTS DISPOSITIVO (
   token        VARCHAR(512) PRIMARY KEY,
   usuario_id   VARCHAR(255) NOT NULL REFERENCES USUARIO(uid) ON DELETE CASCADE
 );
-
--- Notificaciones que el usuario ve en la app (la campana del inicio): las de
--- reservas confirmadas y canceladas, y los recordatorios que también se envían
--- por push. Si la reserva se cancela, reserva_id queda en NULL.
-CREATE TABLE IF NOT EXISTS NOTIFICACION (
-  id           SERIAL PRIMARY KEY,
-  usuario_id   VARCHAR(255) NOT NULL REFERENCES USUARIO(uid) ON DELETE CASCADE,
-  reserva_id   INT REFERENCES RESERVA(id) ON DELETE SET NULL,
-  titulo       VARCHAR(200) NOT NULL,
-  cuerpo       VARCHAR(500) NOT NULL,
-  creada       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  leida        BOOLEAN NOT NULL DEFAULT FALSE
-);
-
-CREATE INDEX IF NOT EXISTS notificacion_usuario_creada
-  ON NOTIFICACION (usuario_id, creada DESC);
