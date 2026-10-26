@@ -88,7 +88,7 @@ class _InicioTabState extends State<InicioTab> {
       final notificaciones = await _api.obtenerNotificaciones();
       if (mounted) {
         setState(
-          () => _hayNotificacionesNuevas = notificaciones.isNotEmpty,
+          () => _hayNotificacionesNuevas = notificaciones.isNotEmpty, //el punto verde siempre se pone si hay notif de reservas, al hacer click se apaga
         );
       }
     } catch (_) {
@@ -99,7 +99,7 @@ class _InicioTabState extends State<InicioTab> {
   void _abrirNotificaciones() {
     // El punto se apaga al abrir el panel; vuelve si hay recordatorios al recargar
     setState(() => _hayNotificacionesNuevas = false);
-    mostrarNotificaciones(context, onAbrirReserva: _abrirReserva);
+    mostrarNotificaciones(context, onAbrirReserva: _abrirReserva); //el metodo _abrirReserva es comun para cuando veo la reserva en la notif o cuando toco en la prox reserva
   }
 
   void _abrirSede(Sede sede) {
